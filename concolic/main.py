@@ -54,13 +54,15 @@ def find_basic_blocks(FILE_OPCODES, FILE_PC_OPCODES):
 	init_pc = 0
 	for opc_number in range(len(FILE_OPCODES)):
 		opc = FILE_OPCODES[opc_number]
-		if (opc.name in separators):
+		if (opc.name in separators and init_pc != FILE_PC_OPCODES[opc_number]):
 			dest = []
-			if(opc.name == 'JUMP' and re.search('PUSH*',FILE_OPCODES[opc_number-1].name)):
+			if (opc.name == 'JUMPDEST'):
+				dest.append(FILE_PC_OPCODES[opc_number] + 1)
+			elif(opc.name == 'JUMP' and re.search('PUSH*',FILE_OPCODES[opc_number-1].name)):
 				dest.append(FILE_OPCODES[opc_number-1].par)
 			elif(opc.name == 'JUMPI' and re.search('PUSH*',FILE_OPCODES[opc_number-1].name)):
+				dest.append(FILE_PC_OPCODES[opc_number] + 1)
 				dest.append(FILE_OPCODES[opc_number - 1].par)
-				dest.append(FILE_PC_OPCODES[opc_number]+1)
 			pc = FILE_PC_OPCODES[opc_number]
 			basic_blocks.append(basicblock.BasicBlock(init_pc, pc, opc.name, dest))
 			init_pc = FILE_PC_OPCODES[opc_number+1]
@@ -86,19 +88,28 @@ def find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES):
 				pos = i
 				break
 
-		for i in range(pos, len(FILE_OPCODES)):
-			if(FILE_OPCODES[i].name == "CALLDATASIZE"):
-				pos = i
-				break
-
+		#for i in range(pos, len(FILE_OPCODES)):
+		#	if(FILE_OPCODES[i].name == "CALLDATASIZE"):
+		#		pos = i
+		#		break
+		count = 0
+		rem = 3
 		for i in range(pos, len(FILE_OPCODES)):
 			if(FILE_OPCODES[i].name == "JUMPDEST"):
-				break
-			if(FILE_OPCODES[i].name == "CALLDATALOAD"):
-				if(FILE_OPCODES[i+1].name == "ISZERO"):
+				rem = rem -1
+				if(rem == 0):
+					break
+			elif(FILE_OPCODES[i].name == "CALLDATALOAD"):
+				if (count > 0):
+					count = count-1
+				elif(FILE_OPCODES[i+1].name == "ISZERO"):
 					pars.append("bool")
 				elif(FILE_OPCODES[i+1].name == "SWAP1"):
-					pars.append("int256")
+					if(FILE_OPCODES[i+5].name == "DUP3"):
+						pars.append("string")
+						count = 1
+					else:
+						pars.append("int256")
 				elif (re.search('PUSH*',FILE_OPCODES[i+1].name)):
 					if(FILE_OPCODES[i+2].name == "NOT"):
 						pars.append("bytes" + str(32 - opcodes.byte_values.get(str(FILE_OPCODES[i+1].par))))
