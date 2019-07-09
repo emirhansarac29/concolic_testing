@@ -1,3 +1,12 @@
+import sha3
+from web3 import Web3
+from ethereum_data import *
+"""
+INITIALIZATION
+"""
+
+ETHERSCAN_API = None
+
 """
 SIMULATION ATOMS
 """
@@ -5,7 +14,7 @@ GLOBAL_STATE= {}
 
 STACK = []
 
-MEMORY = []
+MEMORY = []             # Each element is 8 bit(1 byte)
 next_mem_loc = 0
 
 STORAGE = {}
@@ -16,6 +25,39 @@ USEFUL STUFFS
 UNSIGNED_BOUND_NUMBER = 2**256 - 1
 
 NEGATIVE_BOUND_NUMBER = 2**256
+
+BYTE_BOUND_NUMBER = 2**8 - 1
+
+"""
+CONTRACT PROPERTIES
+"""
+CONTRACT_PROPERTIES = {
+  "env": {
+    "currentCoinbase": "2adc25665018aa1fe0e6bc666dac8fc2697ff9ba",
+    "currentDifficulty": "0x0100",
+    "currentGasLimit": "0x0f4240",
+    "currentNumber": "0x00"
+  },
+  "exec": {
+    "data": "0xff",
+    "gas": "0x0186a0",
+    "gasPrice": "0x5af3107a4000",
+    "origin": 0xcd1722f3947def4cf144679da39c4c32bdc35681,
+    "value": "0x0de0b6b3a7640000"
+  },
+  "gas": "0x013874",
+  "Is": {
+  	"address": 0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6,
+    "balance": "0xd3c21bcecceda1000000"
+  },
+  "Ia": {
+  	"address": 0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6,
+    "balance": "0xd3c21bcecceda1000000",
+    "storage": {
+      "0x00": "0x2222"
+    }
+  }
+}
 
 """
 444 --> STOP
@@ -256,60 +298,217 @@ def execute_opcode(opcode):
             STACK.append(result)
         else:
             return 222
-    elif (opcode == 'BYTE'):
-        print("asd")
-    elif (opcode == 'KECCAK256'):
-        print("asd")
-    elif (opcode == 'ADDRESS'):
-        print("asd")
+    elif (opcode == 'BYTE'):    # DONE
+        if (len(STACK) > 1):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            second_arg = STACK.pop()
+            result = 0
+            if (first_arg < 32 and first_arg >= 0):
+                result = (second_arg >> (248 - (first_arg * 8))) & BYTE_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
+    elif (opcode == 'KECCAK256'):   # DONE
+        if (len(STACK) > 1):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            second_arg = STACK.pop()
+            data = read_from_mem(first_arg, second_arg)
+            hashed = Web3.sha3(data)
+            hashed_hex = Web3.toHex(hashed)
+            result = int(hashed_hex)
+            STACK.append(result)
+        else:
+            return 222
+    elif (opcode == 'ADDRESS'):     # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = CONTRACT_PROPERTIES['Ia']['address']
+        STACK.append(int(result))
     elif (opcode == 'BALANCE'):
-        print("asd")
+        if len(STACK) > 0:
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = ETHERSCAN_API.getBalance(str(first_arg))
+            STACK.append(int(result))
+        else:
+            raise 222
     elif (opcode == 'ORIGIN'):
-        print("asd")
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = GLOBAL_STATE['exec']['origin']
+        STACK.append(int(result))
     elif (opcode == 'CALLER'):
-        print("asd")
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = GLOBAL_STATE["Is"]["address"]
+        STACK.append(int(result))
     elif (opcode == 'CALLVALUE'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'CALLDATALOAD'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'CALLDATASIZE'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'CALLDATACOPY'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'CODESIZE'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'CODECOPY'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'GASPRICE'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'EXTCODESIZE'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'EXTCODECOPY'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'BLOCKHASH'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'COINBASE'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'TIMESTAMP'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'NUMBER'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'DIFFICULTY'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'GASLIMIT'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'POP'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'MLOAD'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'MSTORE'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'MSTORE8'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'SLOAD'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'SSTORE'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(result)
+        else:
+            return 222
     elif (opcode == 'JUMP'):
         print("asd")
     elif (opcode == 'JUMPI'):
@@ -492,3 +691,12 @@ def to_signed(num):
     if(num >= (2**255)):
         return num - (2**256)
     return num
+
+def read_from_mem(offset, length):
+    ret = ""
+    for a in range(0,length):
+        ret = ret + str(MEMORY[offset + length])
+    return int(ret)
+
+def init_etherscan():
+    ETHERSCAN_API = EthereumData()

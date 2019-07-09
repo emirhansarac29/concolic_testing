@@ -6,7 +6,7 @@ import sys
 import re
 import opcodes
 import basicblock
-
+import eth
 
 class OPCODE:
 	def __init__(self, name, par):

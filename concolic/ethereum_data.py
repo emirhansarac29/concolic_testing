@@ -7,12 +7,11 @@ import logging
 log = logging.getLogger(__name__)
 
 class EthereumData:
-        def __init__(self, contract_address):
+        def __init__(self):
             self.apiDomain = "https://api.etherscan.io/api"
-            self.apikey = "VT4IW6VK7VES1Q9NYFI74YKH8U7QW9XRHN"
-            self.contract_addr = contract_address
+            self.apikey = "6MZ7MBW1DAQM2PAETE3ZPAK9377Y7ZX2CJ"
 
-        def getBalance(self, address):
+        def getBalance(self, address):  # address should be string
             try:
                 apiEndPoint = "%s?module=account&action=balance&address=%s&tag=latest&apikey=%s" % (self.apiDomain, address, self.apikey)
                 r = requests.get(apiEndPoint)
@@ -34,17 +33,3 @@ class EthereumData:
                 log.exception("Error at: contract address: %s" % address)
                 raise e
             return result
-
-        def getStorageAt(self, position):
-            try:
-                position = hex(position)
-                if position[-1] == "L":
-                    position = position[:-1]
-                apiEndPoint = "%s?module=proxy&action=eth_getStorageAt&address=%s&position=%s&tag=latest&apikey=%s" % (self.apiDomain, self.contract_addr, position, self.apikey)
-                r = requests.get(apiEndPoint)
-                result = r.json()["result"]
-            except Exception as e:
-                if str(e) != 'timeout':
-                    log.exception("Error at: contract address: %s, position: %s" % (self.contract_addr, position))
-                raise
-            return int(result, 16)
