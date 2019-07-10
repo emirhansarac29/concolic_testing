@@ -40,10 +40,11 @@ CONTRACT_PROPERTIES = {
   },
   "exec": {
     "data": "0xff",
+    "calldata": "0xff",
     "gas": "0x0186a0",
     "gasPrice": "0x5af3107a4000",
     "origin": 0xcd1722f3947def4cf144679da39c4c32bdc35681,
-    "value": "0x0de0b6b3a7640000"
+    "value": 0x0de0b6b3a7640000
   },
   "gas": "0x013874",
   "Is": {
@@ -325,7 +326,7 @@ def execute_opcode(opcode):
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
         result = CONTRACT_PROPERTIES['Ia']['address']
         STACK.append(int(result))
-    elif (opcode == 'BALANCE'):
+    elif (opcode == 'BALANCE'):     # DONE
         if len(STACK) > 0:
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
@@ -333,38 +334,32 @@ def execute_opcode(opcode):
             STACK.append(int(result))
         else:
             raise 222
-    elif (opcode == 'ORIGIN'):
+    elif (opcode == 'ORIGIN'):      # DONE
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-        result = GLOBAL_STATE['exec']['origin']
+        result = CONTRACT_PROPERTIES['exec']['origin']
         STACK.append(int(result))
-    elif (opcode == 'CALLER'):
+    elif (opcode == 'CALLER'):      # DONE
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-        result = GLOBAL_STATE["Is"]["address"]
+        result = CONTRACT_PROPERTIES["Is"]["address"]
         STACK.append(int(result))
-    elif (opcode == 'CALLVALUE'):
+    elif (opcode == 'CALLVALUE'):   # DONE    XXXXXXX
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = CONTRACT_PROPERTIES['exec']['value']
+        STACK.append(int(result))
+    elif (opcode == 'CALLDATALOAD'):    # DONE
         if (len(STACK) > 0):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
+            data = CONTRACT_PROPERTIES['exec']['calldata']
+            result = data[(2+first_arg):(66+first_arg)]
+            STACK.append(int(result,16))
         else:
             return 222
-    elif (opcode == 'CALLDATALOAD'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
-        else:
-            return 222
-    elif (opcode == 'CALLDATASIZE'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
-        else:
-            return 222
+    elif (opcode == 'CALLDATASIZE'):    # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        data = CONTRACT_PROPERTIES['exec']['calldata']
+        result = (len(data)-2)/2
+        STACK.append(result)
     elif (opcode == 'CALLDATACOPY'):
         if (len(STACK) > 0):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1

@@ -6,165 +6,172 @@ import sys
 import re
 import opcodes
 import basicblock
-import eth
+
 
 class OPCODE:
-	def __init__(self, name, par):
-		self.name = name
-		self.par = par
+    def __init__(self, name, par):
+        self.name = name
+        self.par = par
+
 
 class FUNCTION:
-	def __init__(self, begin, signature):
-		self.begin = begin
-		self.signature = signature
+    def __init__(self, begin, signature):
+        self.begin = begin
+        self.signature = signature
+
 
 def get_opcodes(bin_file):
-	arr_opc = []
-	arr_pc_opc = []
-	lens = len(bin_file)
-	bin_file = bin_file[0:lens - 1]
-	lens = lens - 1
+    arr_opc = []
+    arr_pc_opc = []
+    lens = len(bin_file)
+    bin_file = bin_file[0:lens - 1]
+    lens = lens - 1
 
-	index = 0
-	while (index <= lens - 2):
-		opc_number = bin_file[index:index + 2]
-		if (opcodes.opcodes.get(opc_number) == None):
-			arr_opc.append(OPCODE('ERROR', ''))
-			arr_pc_opc.append(index / 2)
-			index = index + 2
-		else:
-			op_name = opcodes.opcodes.get(opc_number)
-			arr_pc_opc.append(index / 2)
-			index = index + 2
-			op_par = int(opcodes.op_param.get(op_name))
-			if (op_par != 0):
-				opc_param = bin_file[index:index + op_par]
-				arr_opc.append(OPCODE(op_name, int(opc_param, 16)))  # INTEGER
-				#arr_opc.append(OPCODE(op_name, opc_param))				# HEX
-				index = index + op_par
-			else:
-				arr_opc.append(OPCODE(op_name, ''))
+    index = 0
+    while (index <= lens - 2):
+        opc_number = bin_file[index:index + 2]
+        if (opcodes.opcodes.get(opc_number) == None):
+            arr_opc.append(OPCODE('ERROR', ''))
+            arr_pc_opc.append(index / 2)
+            index = index + 2
+        else:
+            op_name = opcodes.opcodes.get(opc_number)
+            arr_pc_opc.append(index / 2)
+            index = index + 2
+            op_par = int(opcodes.op_param.get(op_name))
+            if (op_par != 0):
+                opc_param = bin_file[index:index + op_par]
+                arr_opc.append(OPCODE(op_name, int(opc_param, 16)))  # INTEGER
+                # arr_opc.append(OPCODE(op_name, opc_param))				# HEX
+                index = index + op_par
+            else:
+                arr_opc.append(OPCODE(op_name, ''))
 
-	return arr_opc, arr_pc_opc
+    return arr_opc, arr_pc_opc
 
 
 def find_basic_blocks(FILE_OPCODES, FILE_PC_OPCODES):
-	separators = ['JUMPI', 'STOP', 'RETURN', 'SUICIDE', 'JUMP', 'JUMPDEST']
-	basic_blocks = []
-	init_pc = 0
-	for opc_number in range(len(FILE_OPCODES)):
-		opc = FILE_OPCODES[opc_number]
-		if (opc.name in separators and init_pc != FILE_PC_OPCODES[opc_number]):
-			dest = []
-			if (opc.name == 'JUMPDEST'):
-				dest.append(FILE_PC_OPCODES[opc_number] + 1)
-			elif(opc.name == 'JUMP' and re.search('PUSH*',FILE_OPCODES[opc_number-1].name)):
-				dest.append(FILE_OPCODES[opc_number-1].par)
-			elif(opc.name == 'JUMPI' and re.search('PUSH*',FILE_OPCODES[opc_number-1].name)):
-				dest.append(FILE_PC_OPCODES[opc_number] + 1)
-				dest.append(FILE_OPCODES[opc_number - 1].par)
-			pc = FILE_PC_OPCODES[opc_number]
-			basic_blocks.append(basicblock.BasicBlock(init_pc, pc, opc.name, dest))
-			init_pc = FILE_PC_OPCODES[opc_number+1]
-	return basic_blocks
+    separators = ['JUMPI', 'STOP', 'RETURN', 'SUICIDE', 'JUMP', 'JUMPDEST']
+    basic_blocks = []
+    init_pc = 0
+    for opc_number in range(len(FILE_OPCODES)):
+        opc = FILE_OPCODES[opc_number]
+        if (opc.name in separators and init_pc != FILE_PC_OPCODES[opc_number]):
+            dest = []
+            if (opc.name == 'JUMPDEST'):
+                dest.append(FILE_PC_OPCODES[opc_number] + 1)
+            elif (opc.name == 'JUMP' and re.search('PUSH*', FILE_OPCODES[opc_number - 1].name)):
+                dest.append(FILE_OPCODES[opc_number - 1].par)
+            elif (opc.name == 'JUMPI' and re.search('PUSH*', FILE_OPCODES[opc_number - 1].name)):
+                dest.append(FILE_PC_OPCODES[opc_number] + 1)
+                dest.append(FILE_OPCODES[opc_number - 1].par)
+            pc = FILE_PC_OPCODES[opc_number]
+            basic_blocks.append(basicblock.BasicBlock(init_pc, pc, opc.name, dest))
+            init_pc = FILE_PC_OPCODES[opc_number + 1]
+    return basic_blocks
+
 
 def find_functions(FILE_OPCODES):
-	functions = []
-	for num in range(0,len(FILE_OPCODES)):
-		if (FILE_OPCODES[num].name == "REVERT"):
-			break
-		if (FILE_OPCODES[num].name == "DUP1" and FILE_OPCODES[num + 1].name == "PUSH4" and FILE_OPCODES[num+2].name == "EQ" and re.search('PUSH*',FILE_OPCODES[num+3].name) and FILE_OPCODES[num+4].name == "JUMPI"):
-			functions.append(FUNCTION(FILE_OPCODES[num+3].par, FILE_OPCODES[num+1].par))
-	return functions
+    functions = []
+    for num in range(0, len(FILE_OPCODES)):
+        if (FILE_OPCODES[num].name == "REVERT"):
+            break
+        if (FILE_OPCODES[num].name == "DUP1" and FILE_OPCODES[num + 1].name == "PUSH4" and FILE_OPCODES[
+            num + 2].name == "EQ" and re.search('PUSH*', FILE_OPCODES[num + 3].name) and FILE_OPCODES[
+            num + 4].name == "JUMPI"):
+            functions.append(FUNCTION(FILE_OPCODES[num + 3].par, FILE_OPCODES[num + 1].par))
+    return functions
+
 
 def find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES):
-	parameters = {}
-	for func in FUNCTIONS:
-		pars = []
+    parameters = {}
+    for func in FUNCTIONS:
+        pars = []
 
-		pos = 0
-		for i in range(0, len(FILE_PC_OPCODES)):
-			if(FILE_PC_OPCODES[i] == func.begin):
-				pos = i
-				break
+        pos = 0
+        for i in range(0, len(FILE_PC_OPCODES)):
+            if (FILE_PC_OPCODES[i] == func.begin):
+                pos = i
+                break
 
-		#for i in range(pos, len(FILE_OPCODES)):
-		#	if(FILE_OPCODES[i].name == "CALLDATASIZE"):
-		#		pos = i
-		#		break
-		count = 0
-		rem = 3
-		for i in range(pos, len(FILE_OPCODES)):
-			if(FILE_OPCODES[i].name == "JUMPDEST"):
-				rem = rem -1
-				if(rem == 0):
-					break
-			elif(FILE_OPCODES[i].name == "CALLDATALOAD"):
-				if (count > 0):
-					count = count-1
-				elif(FILE_OPCODES[i+1].name == "ISZERO"):
-					pars.append("bool")
-				elif(FILE_OPCODES[i+1].name == "SWAP1"):
-					if(FILE_OPCODES[i+5].name == "DUP3"):
-						pars.append("string")
-						count = 1
-					else:
-						pars.append("int256")
-				elif (re.search('PUSH*',FILE_OPCODES[i+1].name)):
-					if(FILE_OPCODES[i+2].name == "NOT"):
-						pars.append("bytes" + str(32 - opcodes.byte_values.get(str(FILE_OPCODES[i+1].par))))
-					elif(FILE_OPCODES[i+2].name == "AND"):
-						pars.append("uint" + str(8 * opcodes.byte_values.get(str(FILE_OPCODES[i + 1].par))))
-					elif (FILE_OPCODES[i+2].name == "SIGNEXTEND"):
-						pars.append("int" + str(8 * (FILE_OPCODES[i + 1].par + 1)))
+        # for i in range(pos, len(FILE_OPCODES)):
+        #	if(FILE_OPCODES[i].name == "CALLDATASIZE"):
+        #		pos = i
+        #		break
+        count = 0
+        rem = 3
+        for i in range(pos, len(FILE_OPCODES)):
+            if (FILE_OPCODES[i].name == "JUMPDEST"):
+                rem = rem - 1
+                if (rem == 0):
+                    break
+            elif (FILE_OPCODES[i].name == "CALLDATALOAD"):
+                if (count > 0):
+                    count = count - 1
+                elif (FILE_OPCODES[i + 1].name == "ISZERO"):
+                    pars.append("bool")
+                elif (FILE_OPCODES[i + 1].name == "SWAP1"):
+                    if (FILE_OPCODES[i + 5].name == "DUP3"):
+                        pars.append("string")
+                        count = 1
+                    else:
+                        pars.append("int256")
+                elif (re.search('PUSH*', FILE_OPCODES[i + 1].name)):
+                    if (FILE_OPCODES[i + 2].name == "NOT"):
+                        pars.append("bytes" + str(32 - opcodes.byte_values.get(str(FILE_OPCODES[i + 1].par))))
+                    elif (FILE_OPCODES[i + 2].name == "AND"):
+                        pars.append("uint" + str(8 * opcodes.byte_values.get(str(FILE_OPCODES[i + 1].par))))
+                    elif (FILE_OPCODES[i + 2].name == "SIGNEXTEND"):
+                        pars.append("int" + str(8 * (FILE_OPCODES[i + 1].par + 1)))
 
-		parameters[func.signature] = pars
+        parameters[func.signature] = pars
 
-	return parameters
+    return parameters
 
 
 """
 solc --bin-runtime asd.sol > bin.txt
 solc --optimize --opcodes asd.sol 
 """
+
+
 def main():
-	if (len(sys.argv) != 2):
-		exit()
-	solidity_file = sys.argv[1]
-	os.system("solc --bin-runtime " + solidity_file + " > bin.txt")
-	f = open('bin.txt', 'r')
-	bin_file = f.read()
-	f.close()
+    if (len(sys.argv) != 2):
+        exit()
+    solidity_file = sys.argv[1]
+    os.system("solc --bin-runtime " + solidity_file + " > bin.txt")
+    f = open('bin.txt', 'r')
+    bin_file = f.read()
+    f.close()
 
-	index = bin_file.index('part:')
-	bin_file = bin_file[index + 7:]
+    index = bin_file.index('part:')
+    bin_file = bin_file[index + 7:]
 
-	FILE_OPCODES, FILE_PC_OPCODES = get_opcodes(bin_file)
-	for a in range(len(FILE_PC_OPCODES)):
-		FILE_PC_OPCODES[a] = int(FILE_PC_OPCODES[a])
+    FILE_OPCODES, FILE_PC_OPCODES = get_opcodes(bin_file)
+    for a in range(len(FILE_PC_OPCODES)):
+        FILE_PC_OPCODES[a] = int(FILE_PC_OPCODES[a])
 
-	for a in range(len(FILE_OPCODES)):
-		print( "[" + str(FILE_PC_OPCODES[a]) + "]" + " " +FILE_OPCODES[a].name + "  " + str(FILE_OPCODES[a].par))
+    for a in range(len(FILE_OPCODES)):
+        print("[" + str(FILE_PC_OPCODES[a]) + "]" + " " + FILE_OPCODES[a].name + "  " + str(FILE_OPCODES[a].par))
 
-	print(len(FILE_PC_OPCODES))
-	print(len(FILE_OPCODES))
+    print(len(FILE_PC_OPCODES))
+    print(len(FILE_OPCODES))
 
-	basic_blocks = find_basic_blocks(FILE_OPCODES, FILE_PC_OPCODES)
-	for i in basic_blocks:
-		print(str(i.start) + " <-> " + str(i.end) + " <-> " + i.termination + " <-> " + str(i.targets))
+    basic_blocks = find_basic_blocks(FILE_OPCODES, FILE_PC_OPCODES)
+    for i in basic_blocks:
+        print(str(i.start) + " <-> " + str(i.end) + " <-> " + i.termination + " <-> " + str(i.targets))
 
-	FUNCTIONS = find_functions(FILE_OPCODES)
-	for a in FUNCTIONS:
-		print(str(a.begin) + " <-> " + str(a.signature))
+    FUNCTIONS = find_functions(FILE_OPCODES)
+    for a in FUNCTIONS:
+        print(str(a.begin) + " <-> " + str(a.signature))
 
-	FUNCTION_PARAMETERS = find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES)
-	print(FUNCTION_PARAMETERS)
-	print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
+    FUNCTION_PARAMETERS = find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES)
+    print(FUNCTION_PARAMETERS)
+    print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
+
 
 if __name__ == '__main__':
-	main()
-
-
+    main()
 
 """
 395  solc --opcodes asd.sol 
