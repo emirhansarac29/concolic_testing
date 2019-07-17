@@ -25,10 +25,12 @@ def formed(num):
         return NEGATIVE_BOUND_NUMBER + num
     return num
 
-k = EthereumData()
-lo = k.getBalance("0x52bc44d5378309EE2abF1539BF71dE1b7d7bE3b5")
-print(int(lo)+1)
 """
+k = EthereumData()
+lo = k.getCode("0xb342354cbe6db5823a0b00365ff1ec3ab05f129d")
+print(lo)
+print(lo[3:])
+
 # .decode('utf-8', 'strict')
 a = Web3.sha3(text=u'I♥SF')
 b = b'\xff\xf8\x00\x00\x00\x00\x00\x00'

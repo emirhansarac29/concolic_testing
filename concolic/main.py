@@ -6,6 +6,7 @@ import sys
 import re
 import opcodes
 import basicblock
+import simulation
 
 
 class OPCODE:
@@ -169,6 +170,7 @@ def main():
     print(FUNCTION_PARAMETERS)
     print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
 
+    simulation.init_etherscan()
 
 if __name__ == '__main__':
     main()

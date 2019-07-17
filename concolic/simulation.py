@@ -1,4 +1,5 @@
 import sha3
+import re
 from web3 import Web3
 from ethereum_data import *
 """
@@ -10,7 +11,10 @@ ETHERSCAN_API = None
 """
 SIMULATION ATOMS
 """
-GLOBAL_STATE= {}
+GLOBAL_STATE= {
+    "currentGas": "1000",
+    "pc": 0
+}
 
 STACK = []
 
@@ -36,7 +40,8 @@ CONTRACT_PROPERTIES = {
     "currentCoinbase": "2adc25665018aa1fe0e6bc666dac8fc2697ff9ba",
     "currentDifficulty": "0x0100",
     "currentGasLimit": "0x0f4240",
-    "currentNumber": "0x00"
+    "currentNumber": "0x00",
+    "currentTimestamp": "0x00"
   },
   "exec": {
     "data": "0xff",
@@ -60,11 +65,13 @@ CONTRACT_PROPERTIES = {
   }
 }
 
+IH_BLOCKHASH = "0x0012"
+
 """
 444 --> STOP
 222 --> STACK UNDERFLOW
 """
-def execute_opcode(opcode):
+def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
     if(opcode == 'STOP'):       # DONE
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
         return 444
@@ -360,322 +367,335 @@ def execute_opcode(opcode):
         data = CONTRACT_PROPERTIES['exec']['calldata']
         result = (len(data)-2)/2
         STACK.append(result)
-    elif (opcode == 'CALLDATACOPY'):
-        if (len(STACK) > 0):
+    elif (opcode == 'CALLDATACOPY'):    # DONE
+        if (len(STACK) > 2):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            second_arg = STACK.pop()
+            third_arg = STACK.pop()
+
+            for count in range(0, third_arg):
+                MEMORY[first_arg + third_arg] = CONTRACT_PROPERTIES['exec']['calldata'][2 + second_arg + third_arg]
+        else:
+            return 222
+    elif (opcode == 'CODESIZE'):        # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+
+        f = open('bin.txt', 'r')
+        bin_file = f.read()
+        f.close()
+        index = bin_file.index('part:')
+        bin_file = bin_file[index + 7:][:-1]
+
+        result = len(bin_file)/2
+        STACK.append(result)
+    elif (opcode == 'CODECOPY'):        # DONE
+        if (len(STACK) > 2):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            second_arg = STACK.pop()
+            third_arg = STACK.pop()
+
+            f = open('bin.txt', 'r')
+            bin_file = f.read()
+            f.close()
+            index = bin_file.index('part:')
+            bin_file = bin_file[index + 7:][:-1]
+
+            for count in range(0, third_arg):
+                MEMORY[first_arg + count] = str(bin_file[2*second_arg + 2*count]) + str(bin_file[2*second_arg + 2*count + 1])
+        else:
+            return 222
+    elif (opcode == 'GASPRICE'):        # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = CONTRACT_PROPERTIES['exec']['gasPrice']
+        STACK.append(result)
+    elif (opcode == 'EXTCODESIZE'):     # DONE
+        if (len(STACK) > 3):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            result = len(ETHERSCAN_API.getCode(str(first_arg))) - 2
             STACK.append(result)
         else:
             return 222
-    elif (opcode == 'CODESIZE'):
+    elif (opcode == 'EXTCODECOPY'):     # DONE
         if (len(STACK) > 0):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            second_arg = STACK.pop()
+            third_arg = STACK.pop()
+            fourth_arg = STACK.pop()
+
+            code = ETHERSCAN_API.getCode(str(first_arg))[2:]
+
+            for count in range(0, fourth_arg):
+                MEMORY[second_arg + count] = str(code[2*third_arg + 2*count]) + str(code[2*third_arg + 2*count + 1])
+
+        else:
+            return 222
+    elif (opcode == 'BLOCKHASH'):       # NOT COMPLETE YET
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            STACK.pop()
+            result = IH_BLOCKHASH
             STACK.append(result)
         else:
             return 222
-    elif (opcode == 'CODECOPY'):
+    elif (opcode == 'COINBASE'):        # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = CONTRACT_PROPERTIES['evn']['currentCoinbase']
+        STACK.append(result)
+    elif (opcode == 'TIMESTAMP'):       # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = CONTRACT_PROPERTIES['evn']['currentTimestamp']
+        STACK.append(result)
+    elif (opcode == 'NUMBER'):          # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = CONTRACT_PROPERTIES['evn']['currentNumber']
+        STACK.append(result)
+    elif (opcode == 'DIFFICULTY'):      # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = CONTRACT_PROPERTIES['evn']['currentDifficulty']
+        STACK.append(result)
+    elif (opcode == 'GASLIMIT'):        # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = CONTRACT_PROPERTIES['evn']['currentGasLimit']
+        STACK.append(result)
+    elif (opcode == 'POP'):             # DONE
         if (len(STACK) > 0):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
         else:
             return 222
-    elif (opcode == 'GASPRICE'):
+    elif (opcode == 'MLOAD'):           # DONE
         if (len(STACK) > 0):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+
+            k = ""
+            for i in range(0, 32):
+                k = k + MEMORY[first_arg + i]
+            result = k
             STACK.append(result)
         else:
             return 222
-    elif (opcode == 'EXTCODESIZE'):
+    elif (opcode == 'MSTORE'):          # DONE
+        if (len(STACK) > 1):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = STACK.pop()
+            second_arg = STACK.pop()
+
+            len_arg = len(second_arg)
+            if(len_arg < 64):
+                dif = 64 - len_arg
+                second_arg = "0"*dif + second_arg
+
+            for i in range(0, 32):
+                MEMORY[first_arg + i] = second_arg[2*i:2*i + 2]
+        else:
+            return 222
+    elif (opcode == 'MSTORE8'):         # DONE
         if (len(STACK) > 0):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
+            second_arg = STACK.pop()
+            MEMORY[first_arg] = str(int(second_arg, 16) & 0xFF)
         else:
             return 222
-    elif (opcode == 'EXTCODECOPY'):
+    elif (opcode == 'SLOAD'):           # DONE
         if (len(STACK) > 0):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+            result = STORAGE[first_arg]
             STACK.append(result)
         else:
             return 222
-    elif (opcode == 'BLOCKHASH'):
-        if (len(STACK) > 0):
+    elif (opcode == 'SSTORE'):          # DONE
+        if (len(STACK) > 1):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
+            second_arg = STACK.pop()
+            STORAGE[first_arg] = second_arg
         else:
             return 222
-    elif (opcode == 'COINBASE'):
+    elif (opcode == 'JUMP'):            # DONE
         if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
+            GLOBAL_STATE["pc"] = first_arg
         else:
             return 222
-    elif (opcode == 'TIMESTAMP'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+    elif (opcode == 'JUMPI'):           # DONE
+        if (len(STACK) > 1):
             first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
+            second_arg = STACK.pop()
+            if second_arg == "1":    # "1" will represent true and "0" will be false
+                GLOBAL_STATE["pc"] = first_arg
+            else:
+                GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
         else:
             return 222
-    elif (opcode == 'NUMBER'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
+    elif (opcode == 'PC'):              # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = GLOBAL_STATE["pc"] - 1
+        STACK.append(result)
+    elif (opcode == 'MSIZE'):           # NOT COMPLETE and len cannot be true one!!!
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = len(MEMORY)
+        STACK.append(result)
+    elif (opcode == 'GAS'):             # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        result = GLOBAL_STATE['currentGas']
+        STACK.append(result)
+    elif (opcode == 'JUMPDEST'):        # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+    elif (opcode.startswith('PUSH', 0)):    # DONE
+        position = int(opcode[4:], 10)
+        old_pc = GLOBAL_STATE["pc"]
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1 + position
+        index = FILE_PC_OPCODES.index(old_pc)
+        result = FILE_OPCODES[index].par
+        STACK.append(result)
+    elif (opcode.startswith("DUP", 0)):     # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        position = int(opcode[3:], 10)
+        if(len(STACK) > position-1):
+            first_arg = STACK[len(STACK)-position]
+            STACK.append(first_arg)
         else:
             return 222
-    elif (opcode == 'DIFFICULTY'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
+    elif (opcode.startswith("SWAP", 0)):    # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        position = int(opcode[4:], 10)
+        if (len(STACK) > position):
+            temp = STACK[len(STACK) - 1 - position]
+            STACK[len(STACK) - 1 - position] = STACK[len(STACK) - 1]
+            STACK[len(STACK) - 1] = temp
         else:
             return 222
-    elif (opcode == 'GASLIMIT'):
-        if (len(STACK) > 0):
+    elif (opcode == 'LOG0'):                # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        STACK.pop()
+        STACK.pop()
+    elif (opcode == 'LOG1'):                # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        STACK.pop()
+        STACK.pop()
+        STACK.pop()
+    elif (opcode == 'LOG2'):                # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        STACK.pop()
+        STACK.pop()
+        STACK.pop()
+        STACK.pop()
+    elif (opcode == 'LOG3'):                # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        STACK.pop()
+        STACK.pop()
+        STACK.pop()
+        STACK.pop()
+        STACK.pop()
+    elif (opcode == 'LOG4'):                # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+        STACK.pop()
+        STACK.pop()
+        STACK.pop()
+        STACK.pop()
+        STACK.pop()
+        STACK.pop()
+    elif (opcode == 'CREATE'):      # WILL BE COMPLETED LATER
+        if (len(STACK) > 2):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
+            STACK.pop()
+            STACK.pop()
+            STACK.pop()
+
+            STACK.append("NONONO")
         else:
             return 222
-    elif (opcode == 'POP'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
-        else:
-            return 222
-    elif (opcode == 'MLOAD'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
-        else:
-            return 222
-    elif (opcode == 'MSTORE'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
-        else:
-            return 222
-    elif (opcode == 'MSTORE8'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
-        else:
-            return 222
-    elif (opcode == 'SLOAD'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
-        else:
-            return 222
-    elif (opcode == 'SSTORE'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = STACK.pop()
-            result = (~first_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(result)
-        else:
-            return 222
-    elif (opcode == 'JUMP'):
-        print("asd")
-    elif (opcode == 'JUMPI'):
-        print("asd")
-    elif (opcode == 'PC'):
-        print("asd")
-    elif (opcode == 'MSIZE'):
-        print("asd")
-    elif (opcode == 'GAS'):
-        print("asd")
-    elif (opcode == 'JUMPDEST'):
-        print("asd")
-    elif (opcode == 'PUSH1'):
-        print("asd")
-    elif (opcode == 'PUSH2'):
-        print("asd")
-    elif (opcode == 'PUSH3'):
-        print("asd")
-    elif (opcode == 'PUSH4'):
-        print("asd")
-    elif (opcode == 'PUSH5'):
-        print("asd")
-    elif (opcode == 'PUSH6'):
-        print("asd")
-    elif (opcode == 'PUSH7'):
-        print("asd")
-    elif (opcode == 'PUSH8'):
-        print("asd")
-    elif (opcode == 'PUSH9'):
-        print("asd")
-    elif (opcode == 'PUSH10'):
-        print("asd")
-    elif (opcode == 'PUSH11'):
-        print("asd")
-    elif (opcode == 'PUSH12'):
-        print("asd")
-    elif (opcode == 'PUSH13'):
-        print("asd")
-    elif (opcode == 'PUSH14'):
-        print("asd")
-    elif (opcode == 'PUSH15'):
-        print("asd")
-    elif (opcode == 'PUSH16'):
-        print("asd")
-    elif (opcode == 'PUSH17'):
-        print("asd")
-    elif (opcode == 'PUSH18'):
-        print("asd")
-    elif (opcode == 'PUSH19'):
-        print("asd")
-    elif (opcode == 'PUSH20'):
-        print("asd")
-    elif (opcode == 'PUSH21'):
-        print("asd")
-    elif (opcode == 'PUSH22'):
-        print("asd")
-    elif (opcode == 'PUSH23'):
-        print("asd")
-    elif (opcode == 'PUSH24'):
-        print("asd")
-    elif (opcode == 'PUSH25'):
-        print("asd")
-    elif (opcode == 'PUSH26'):
-        print("asd")
-    elif (opcode == 'PUSH27'):
-        print("asd")
-    elif (opcode == 'PUSH28'):
-        print("asd")
-    elif (opcode == 'PUSH29'):
-        print("asd")
-    elif (opcode == 'PUSH30'):
-        print("asd")
-    elif (opcode == 'PUSH31'):
-        print("asd")
-    elif (opcode == 'PUSH32'):
-        print("asd")
-    elif (opcode == 'DUP1'):
-        print("asd")
-    elif (opcode == 'DUP2'):
-        print("asd")
-    elif (opcode == 'DUP3'):
-        print("asd")
-    elif (opcode == 'DUP4'):
-        print("asd")
-    elif (opcode == 'DUP5'):
-        print("asd")
-    elif (opcode == 'DUP6'):
-        print("asd")
-    elif (opcode == 'DUP7'):
-        print("asd")
-    elif (opcode == 'DUP8'):
-        print("asd")
-    elif (opcode == 'DUP9'):
-        print("asd")
-    elif (opcode == 'DUP10'):
-        print("asd")
-    elif (opcode == 'DUP11'):
-        print("asd")
-    elif (opcode == 'DUP12'):
-        print("asd")
-    elif (opcode == 'DUP13'):
-        print("asd")
-    elif (opcode == 'DUP14'):
-        print("asd")
-    elif (opcode == 'DUP15'):
-        print("asd")
-    elif (opcode == 'DUP16'):
-        print("asd")
-    elif (opcode == 'SWAP1'):
-        print("asd")
-    elif (opcode == 'SWAP2'):
-        print("asd")
-    elif (opcode == 'SWAP3'):
-        print("asd")
-    elif (opcode == 'SWAP4'):
-        print("asd")
-    elif (opcode == 'SWAP5'):
-        print("asd")
-    elif (opcode == 'SWAP6'):
-        print("asd")
-    elif (opcode == 'SWAP7'):
-        print("asd")
-    elif (opcode == 'SWAP8'):
-        print("asd")
-    elif (opcode == 'SWAP9'):
-        print("asd")
-    elif (opcode == 'SWAP10'):
-        print("asd")
-    elif (opcode == 'SWAP11'):
-        print("asd")
-    elif (opcode == 'SWAP12'):
-        print("asd")
-    elif (opcode == 'SWAP13'):
-        print("asd")
-    elif (opcode == 'SWAP14'):
-        print("asd")
-    elif (opcode == 'SWAP15'):
-        print("asd")
-    elif (opcode == 'SWAP16'):
-        print("asd")
-    elif (opcode == 'LOG0'):
-        print("asd")
-    elif (opcode == 'LOG1'):
-        print("asd")
-    elif (opcode == 'LOG2'):
-        print("asd")
-    elif (opcode == 'LOG3'):
-        print("asd")
-    elif (opcode == 'LOG4'):
-        print("asd")
-    elif (opcode == 'CREATE'):
-        print("asd")
     elif (opcode == 'CALL'):
-        print("asd")
+        if (len(STACK) > 6):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            outgas = STACK.pop()
+            recipient = STACK.pop()
+            transfer_amount = STACK.pop()
+            start_data_input = STACK.pop()
+            size_data_input = STACK.pop()
+            start_data_output = STACK.pop()
+            size_data_ouput = STACK.pop()
+
+            STACK.append("01")
+        else:
+            return 222
     elif (opcode == 'CALLCODE'):
-        print("asd")
+        if (len(STACK) > 6):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            outgas = STACK.pop()
+            recipient = STACK.pop()
+            transfer_amount = STACK.pop()
+            start_data_input = STACK.pop()
+            size_data_input = STACK.pop()
+            start_data_output = STACK.pop()
+            size_data_ouput = STACK.pop()
+
+            STACK.append("01")
+        else:
+            return 222
     elif (opcode == 'RETURN'):
-        print("asd")
+        if (len(STACK) > 1):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            STACK.pop()
+            STACK.pop()
+        else:
+            return 222
     elif (opcode == 'DELEGATECALL'):
-        print("asd")
+        if (len(STACK) > 1):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            STACK.pop()
+            STACK.pop()
+            STACK.pop()
+            STACK.pop()
+            STACK.pop()
+
+            STACK.append("01")
+        else:
+            return 222
     elif (opcode == 'CALLBLACKBOX'):
-        print("asd")
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
     elif (opcode == 'STATICCALL'):
-        print("asd")
+        if (len(STACK) > 1):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            STACK.pop()
+            STACK.pop()
+            STACK.pop()
+            STACK.pop()
+            STACK.pop()
+
+            STACK.append("01")
+        else:
+            return 222
     elif (opcode == 'REVERT'):
-        print("asd")
+        if (len(STACK) > 1):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            STACK.pop()
+            STACK.pop()
+        else:
+            return 222
     elif (opcode == 'INVALID'):
-        print("asd")
+        return 111
     elif (opcode == 'SUICIDE'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            STACK.pop()
+        else:
+            return 222
     elif (opcode == 'SELFDESTRUCT'):
-        print("asd")
+        if (len(STACK) > 0):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            STACK.pop()
+        else:
+            return 222
+    elif (opcode == 'SELFDESTRUCT'):
+        return 111
 
 def formed(num):
     if(num < 0):
@@ -691,7 +711,7 @@ def read_from_mem(offset, length):
     ret = ""
     for a in range(0,length):
         ret = ret + str(MEMORY[offset + length])
-    return int(ret)
+    return int(ret, 16)
 
 def init_etherscan():
     ETHERSCAN_API = EthereumData()
