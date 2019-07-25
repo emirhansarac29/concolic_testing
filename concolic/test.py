@@ -3,6 +3,7 @@ from web3 import Web3
 import web3
 import pybase64
 from ethereum_data import *
+import helper
 
 k = 115792089237316195423570985008687907853269984665640564039457584007913129639936
 f = k + 6
@@ -25,6 +26,9 @@ def formed(num):
         return NEGATIVE_BOUND_NUMBER + num
     return num
 
+a = helper.GrowingList()
+a[3] = 22
+print(len(a))
 """
 k = EthereumData()
 lo = k.getCode("0xb342354cbe6db5823a0b00365ff1ec3ab05f129d")
