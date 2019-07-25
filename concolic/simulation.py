@@ -13,15 +13,12 @@ ETHERSCAN_API = None
 SIMULATION ATOMS
 """
 GLOBAL_STATE= {
-    "currentGas": "1000",
+    "currentGas": 1000, # int
     "pc": 0             # int
 }
 
 STACK = []              # all int in str format
-# DONT forget to convert memeort to growing list
 MEMORY = helper.GrowingList()             # Each element is 8 bit(1 byte) , 2 hex value  (LIKE ab not like 0xab)
-next_mem_loc = 0
-
 STORAGE = {}            # str(int) --> str(int)
 
 """
@@ -63,10 +60,9 @@ CONTRACT_PROPERTIES = {
     "storage": {
       "0x00": "0x2222"
     }
-  }
+  },
+  "IH_BLOCKHASH": "0x0012"
 }
-
-IH_BLOCKHASH = "0x0012"
 
 """
 444 --> STOP
@@ -444,7 +440,7 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         if (len(STACK) > 0):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             STACK.pop()
-            result = IH_BLOCKHASH
+            result = CONTRACT_PROPERTIES["IH_BLOCKHASH"]
             STACK.append(result)
         else:
             return 222
@@ -553,14 +549,14 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
         result = GLOBAL_STATE["pc"] - 1
         STACK.append(str(result))
-    elif (opcode == 'MSIZE'):           # NOT COMPLETE and len cannot be true one!!!
+    elif (opcode == 'MSIZE'):           # DONE BUT NOT SURE --> NOT COMPLETE and len cannot be true one!!!
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
         result = len(MEMORY)
-        STACK.append(result)
+        STACK.append(str(result))
     elif (opcode == 'GAS'):             # DONE
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-        result = GLOBAL_STATE['currentGas']
-        STACK.append(result)
+        result = GLOBAL_STATE["currentGas"]
+        STACK.append(str(result))
     elif (opcode == 'JUMPDEST'):        # DONE
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
     elif (opcode.startswith('PUSH', 0)):    # DONE
@@ -587,47 +583,25 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             STACK[len(STACK) - 1] = temp
         else:
             return 222
-    elif (opcode == 'LOG0'):                # DONE
+    elif (opcode.startswith("LOG", 0)):     # DONE
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-        STACK.pop()
-        STACK.pop()
-    elif (opcode == 'LOG1'):                # DONE
-        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-        STACK.pop()
-        STACK.pop()
-        STACK.pop()
-    elif (opcode == 'LOG2'):                # DONE
-        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-        STACK.pop()
-        STACK.pop()
-        STACK.pop()
-        STACK.pop()
-    elif (opcode == 'LOG3'):                # DONE
-        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-        STACK.pop()
-        STACK.pop()
-        STACK.pop()
-        STACK.pop()
-        STACK.pop()
-    elif (opcode == 'LOG4'):                # DONE
-        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-        STACK.pop()
-        STACK.pop()
-        STACK.pop()
-        STACK.pop()
-        STACK.pop()
-        STACK.pop()
-    elif (opcode == 'CREATE'):      # WILL BE COMPLETED LATER
+        position = int(opcode[3:], 10)
+        if(len(STACK) > position + 1):
+            for a in range(0, position+2):
+                STACK.pop()
+        else:
+            return 222
+    elif (opcode == 'CREATE'):      # DONE
         if (len(STACK) > 2):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             STACK.pop()
             STACK.pop()
             STACK.pop()
 
-            STACK.append("NONONO")
+            STACK.append("111111")
         else:
             return 222
-    elif (opcode == 'CALL'):
+    elif (opcode == 'CALL'):        # DONE
         if (len(STACK) > 6):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             outgas = STACK.pop()
@@ -638,10 +612,19 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             start_data_output = STACK.pop()
             size_data_ouput = STACK.pop()
 
-            STACK.append("01")
+            balance = int(CONTRACT_PROPERTIES["Ia"]["balance"],16)
+            is_enough_fund = (transfer_amount <= balance)
+
+            if(is_enough_fund):
+                CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
+                CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(CONTRACT_PROPERTIES["Is"]["balance"],16) + transfer_amount))
+                STACK.append("1")
+            else:
+                STACK.append("0")
+
         else:
             return 222
-    elif (opcode == 'CALLCODE'):
+    elif (opcode == 'CALLCODE'):    # DONE
         if (len(STACK) > 6):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             outgas = STACK.pop()
@@ -652,65 +635,71 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             start_data_output = STACK.pop()
             size_data_ouput = STACK.pop()
 
-            STACK.append("01")
+            balance = int(CONTRACT_PROPERTIES["Ia"]["balance"], 16)
+            is_enough_fund = (transfer_amount <= balance)
+
+            if (is_enough_fund):
+                CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
+                CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(CONTRACT_PROPERTIES["Is"]["balance"], 16) + transfer_amount))
+                STACK.append("1")
+            else:
+                STACK.append("0")
         else:
             return 222
-    elif (opcode == 'RETURN'):
+    elif (opcode == 'RETURN'):  # DONE
         if (len(STACK) > 1):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             STACK.pop()
             STACK.pop()
         else:
             return 222
-    elif (opcode == 'DELEGATECALL'):
-        if (len(STACK) > 1):
+    elif (opcode == 'DELEGATECALL'):    # DONE
+        if (len(STACK) > 5):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            STACK.pop()
             STACK.pop()
             STACK.pop()
             STACK.pop()
             STACK.pop()
             STACK.pop()
 
-            STACK.append("01")
+            STACK.append("1")
         else:
             return 222
-    elif (opcode == 'CALLBLACKBOX'):
+    elif (opcode == 'CALLBLACKBOX'):    # DONE
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-    elif (opcode == 'STATICCALL'):
-        if (len(STACK) > 1):
+    elif (opcode == 'STATICCALL'):  # DONE
+        if (len(STACK) > 5):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            STACK.pop()
             STACK.pop()
             STACK.pop()
             STACK.pop()
             STACK.pop()
             STACK.pop()
 
-            STACK.append("01")
+            STACK.append("1")
         else:
             return 222
-    elif (opcode == 'REVERT'):
+    elif (opcode == 'REVERT'):  # DONE
         if (len(STACK) > 1):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             STACK.pop()
             STACK.pop()
         else:
             return 222
-    elif (opcode == 'INVALID'):
+    elif (opcode == 'INVALID'): # DONE
         return 111
-    elif (opcode == 'SUICIDE'):
+    elif (opcode == 'SUICIDE'): # DONE
         if (len(STACK) > 0):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             STACK.pop()
+            transfer_amount = CONTRACT_PROPERTIES["Ia"]["balance"] = int(balance - transfer_amount, 16)
+            CONTRACT_PROPERTIES["Ia"]["balance"] = "0x0"
         else:
             return 222
-    elif (opcode == 'SELFDESTRUCT'):
-        if (len(STACK) > 0):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            STACK.pop()
-        else:
-            return 222
-    elif (opcode == 'SELFDESTRUCT'):
-        return 111
+    else:   # DONE
+        GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
 
 def formed(num):
     if(num < 0):
