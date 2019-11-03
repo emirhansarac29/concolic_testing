@@ -2,7 +2,9 @@ import sha3
 import re
 from web3 import Web3
 from ethereum_data import *
+from z3 import *
 import helper
+import six
 """
 INITIALIZATION
 """
@@ -21,6 +23,11 @@ STACK = []              # all int in str format
 MEMORY = helper.GrowingList()             # Each element is 8 bit(1 byte) , 2 hex value  (LIKE ab not like 0xab)
 STORAGE = {}            # str(int) --> str(int)
 
+"""
+SYMBOLIC SIMULATION ATOMS
+"""
+SYM_STACK = []
+Symbolic_Solver = Solver()
 """
 USEFUL STUFFS
 """
@@ -64,6 +71,232 @@ CONTRACT_PROPERTIES = {
   "IH_BLOCKHASH": "0x0012"
 }
 
+"""
+444 --> STOP
+222 --> STACK UNDERFLOW
+"""
+def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
+    if(opcode == 'STOP'):
+        return 444
+    elif (opcode == 'ADD'):     # DONE
+        if(len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg, second_arg)):
+                result = (first_arg + second_arg) & (UNSIGNED_BOUND_NUMBER)
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = simplify(first_arg + second_arg)
+                SYM_STACK.append(result)
+        else:
+            return 222
+    elif (opcode == 'MUL'):     # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg, second_arg)):
+                result = (first_arg * second_arg) & (UNSIGNED_BOUND_NUMBER)
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = simplify(first_arg * second_arg)
+                SYM_STACK.append(result)
+        else:
+            return 222
+    elif (opcode == 'SUB'):     # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg, second_arg)):
+                result = formed((first_arg - second_arg)) & (UNSIGNED_BOUND_NUMBER)
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = simplify(first_arg - second_arg)
+                SYM_STACK.append(result)
+        else:
+            return 222
+    elif (opcode == 'DIV'):     # DONE
+        if len(SYM_STACK) > 1:
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg, second_arg)):
+                if (second_arg == 0):
+                    result = 0
+                else:
+                    result = (first_arg // second_arg) & (UNSIGNED_BOUND_NUMBER)
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                Symbolic_Solver.push()
+                Symbolic_Solver.add(Not(second_arg == 0))
+                if check_sat() == z3.unsat:
+                    result = 0
+                else:
+                    result = UDiv(first_arg, second_arg)
+                Symbolic_Solver.pop()
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            return 222
+    elif (opcode == 'SDIV'):    # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg, second_arg)):
+                first_arg = to_signed(first_arg)
+                second_arg = to_signed(second_arg)
+                if (second_arg == 0):
+                    result = 0
+                elif (first_arg == -2 ** 255 and second_arg == -1):
+                    result = -2 ** 255
+                else:
+                    sign = -1
+                    if ((first_arg // second_arg) >= 0):
+                        sign = 1
+                    result = sign * (abs(first_arg) // abs(second_arg))
+                STACK.append(formed(result))
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                Symbolic_Solver.push()
+                Symbolic_Solver.add(Not(second_arg == 0))
+                if check_sat() == z3.unsat:
+                    result = 0
+                else:
+                    Symbolic_Solver.push()
+                    Symbolic_Solver.add(Not(And(first_arg == -2**255, second_arg == -1)))
+                    if check_sat() == z3.unsat:
+                        result = -2**255
+                    else:
+                        Symbolic_Solver.push()                  # NEED FURTHER LOOK
+                        Symbolic_Solver.add(first_arg / second_arg < 0)
+                        sign = 1
+                        if (check_sat() == z3.sat):
+                            sign = -1
+                        z3_abs = lambda x: If(x >= 0, x, -x)
+                        first_arg = z3_abs(first_arg)
+                        second_arg = z3_abs(second_arg)
+                        result = sign * (first_arg / second_arg)
+                        Symbolic_Solver.pop()
+                    Symbolic_Solver.pop()
+                Symbolic_Solver.pop()
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            return 222
+    elif (opcode == 'MOD'):     # DONE
+        if len(SYM_STACK) > 1:
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg, second_arg)):
+                if (second_arg == 0):
+                    result = 0
+                else:
+                    result = (first_arg % second_arg) & (UNSIGNED_BOUND_NUMBER)
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                Symbolic_Solver.push()
+                Symbolic_Solver.add(Not(second_arg == 0))
+                if (check_sat() == z3.unsat):
+                    result = 0
+                else:
+                    result = URem(first_arg, second_arg)
+                Symbolic_Solver.pop()
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            return 222
+    elif (opcode == 'SMOD'):    # DONE
+        if len(SYM_STACK) > 1:
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg, second_arg)):
+                first_arg = to_signed(first_arg)
+                second_arg = to_signed(second_arg)
+                if (second_arg == 0):
+                    result = 0
+                else:
+                    sign = -1
+                    if (first_arg >= 0):
+                        sign = 1
+                    result = sign * (abs(first_arg) // abs(second_arg))
+                SYM_STACK.append(formed(result))
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                Symbolic_Solver.push()
+                Symbolic_Solver.add(Not(second_arg == 0))
+                if (check_sat() == z3.unsat):
+                    result = 0
+                else:
+                    Symbolic_Solver.push()
+                    Symbolic_Solver.add(first_arg < 0)
+                    sign = 1
+                    if(check_sat() == z3.sat):
+                        sign = -1
+                    Symbolic_Solver.pop()
+                    z3_abs = lambda x: If(x >= 0, x, -x)
+                    first_arg = z3_abs(first_arg)
+                    second_arg = z3_abs(second_arg)
+                    result = sign * (first_arg % second_arg)
+                Symbolic_Solver.pop()
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            return 222
+    elif (opcode == 'ADDMOD'):  # HERE I AM
+        if (len(STACK) > 2):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = int(STACK.pop())
+            second_arg = int(STACK.pop())
+            third_arg = int(STACK.pop())
+            result = 0
+            if (third_arg != 0):
+                result = (first_arg + second_arg) % (third_arg)
+            STACK.append(str(result))
+        else:
+            return 222
+    elif (opcode == 'MULMOD'):  # DONE
+        if (len(STACK) > 2):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = int(STACK.pop())
+            second_arg = int(STACK.pop())
+            third_arg = int(STACK.pop())
+            result = 0
+            if (third_arg != 0):
+                result = (first_arg * second_arg) % (third_arg)
+            STACK.append(str(result))
+        else:
+            return 222
+    elif (opcode == 'EXP'):     # DONE
+        if (len(STACK) > 1):
+            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+            first_arg = int(STACK.pop())
+            second_arg = int(STACK.pop())
+            result = (first_arg ** second_arg) & UNSIGNED_BOUND_NUMBER
+            STACK.append(str(result))
+        else:
+            return 222
 """
 444 --> STOP
 222 --> STACK UNDERFLOW
@@ -717,5 +950,32 @@ def read_from_mem(offset, length):
         ret = ret + MEMORY[offset + length]
     return int(ret, 16)
 
+# Checks that given parameter is z3 expression or not
+def is_symbolic(exp):
+    return z3.is_expr(exp)
+
+def is_all_real(*args):
+    for element in args:
+        if (is_symbolic(element)):
+            return False
+    return True
+
+def to_symbolic(number):
+    if (is_symbolic(number)):
+        return number
+    return BitVecVal(number, 256)
+
+def check_sat(pop_if_exception=True):
+    try:
+        ret = Symbolic_Solver.check()
+        if ret == unknown:
+            raise Z3Exception(Symbolic_Solver.reason_unknown())
+    except Exception as e:
+        if pop_if_exception:
+            Symbolic_Solver.pop()
+        raise e
+    return ret
+
 def init_etherscan():
+    global ETHERSCAN_API
     ETHERSCAN_API = EthereumData()

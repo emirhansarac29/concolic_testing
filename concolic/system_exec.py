@@ -1298,7 +1298,7 @@ def sym_exec_ins(params, block, instr, func_call, current_func_name):
             raise ValueError('STACK underflow')
     elif opcode == "SUICIDE":
         global_state["pc"] = global_state["pc"] + 1
-        recipient = stack.pop(0)
+          = stack.pop(0)
         transfer_amount = global_state["balance"]["Ia"]
         global_state["balance"]["Ia"] = 0
         if isReal(recipient):

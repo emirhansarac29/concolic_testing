@@ -4,6 +4,8 @@ import web3
 import pybase64
 from ethereum_data import *
 import helper
+from z3 import *
+import six
 
 k = 115792089237316195423570985008687907853269984665640564039457584007913129639936
 f = k + 6
@@ -25,10 +27,43 @@ def formed(num):
     if(num < 0):
         return NEGATIVE_BOUND_NUMBER + num
     return num
+"""
+k = BitVec('k',8)
+l = BitVec('l',8)
+m = BitVec('m',8)
 
-a = helper.GrowingList()
-a[3] = 22
-print(len(a))
+x = Int('x')
+y = Int('y')
+
+s = Solver()
+print(s)
+
+s.add(x > 10, y == x + 2)
+print (s)
+print ("Solving constraints in the solver s ...")
+print (s.check())
+
+s.push()
+s.add(y < 11)
+s.add(y >2)
+s.pop()
+
+print(s)
+"""
+
+z3_abs = lambda x: If(x >= 0, 2*x, -x + 3)
+k = z3_abs(12)
+print(k)
+
+a = BitVecVal(17,4)
+print(a)
+
+k = BitVecVal(1,14)
+l = BitVecVal(3,14)
+print(simplify(k+3))
+
+
+
 """
 k = EthereumData()
 lo = k.getCode("0xb342354cbe6db5823a0b00365ff1ec3ab05f129d")
