@@ -155,22 +155,94 @@ def main():
     for a in range(len(FILE_OPCODES)):
         print("[" + str(FILE_PC_OPCODES[a]) + "]" + " " + FILE_OPCODES[a].name + "  " + str(FILE_OPCODES[a].par))
 
-    print(len(FILE_PC_OPCODES))
-    print(len(FILE_OPCODES))
+    #print(len(FILE_PC_OPCODES))
+    #print(len(FILE_OPCODES))
 
     basic_blocks = find_basic_blocks(FILE_OPCODES, FILE_PC_OPCODES)
-    for i in basic_blocks:
-        print(str(i.start) + " <-> " + str(i.end) + " <-> " + i.termination + " <-> " + str(i.targets))
+    #for i in basic_blocks:
+    #    print(str(i.start) + " <-> " + str(i.end) + " <-> " + i.termination + " <-> " + str(i.targets))
 
     FUNCTIONS = find_functions(FILE_OPCODES)
     for a in FUNCTIONS:
         print(str(a.begin) + " <-> " + str(a.signature))
 
     FUNCTION_PARAMETERS = find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES)
-    print(FUNCTION_PARAMETERS)
-    print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
+    #print(FUNCTION_PARAMETERS)
+    #print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
 
     simulation.init_etherscan()
+
+
+    simulation.MEMORY[0] = "2a"
+    simulation.MEMORY[1] = "33"
+    simulation.MEMORY[2] = "00"
+    simulation.MEMORY[3] = "22"
+    simulation.MEMORY[4] = "2a"
+    simulation.MEMORY[5] = "33"
+    simulation.MEMORY[6] = "00"
+    simulation.MEMORY[7] = "22"
+    simulation.MEMORY[8] = "2a"
+    simulation.MEMORY[9] = "33"
+    simulation.MEMORY[10] = "00"
+    simulation.MEMORY[11] = "22"
+    simulation.MEMORY[12] = "2a"
+    simulation.MEMORY[13] = "33"
+    simulation.MEMORY[14] = "00"
+    simulation.MEMORY[15] = "22"
+    simulation.MEMORY[16] = "2a"
+    simulation.MEMORY[17] = "33"
+    simulation.MEMORY[18] = "00"
+    simulation.MEMORY[19] = "22"
+    simulation.MEMORY[20] = "2a"
+    simulation.MEMORY[21] = "33"
+    simulation.MEMORY[22] = "00"
+    simulation.MEMORY[23] = "22"
+    simulation.MEMORY[24] = "2a"
+    simulation.MEMORY[25] = "33"
+    simulation.MEMORY[26] = "00"
+    simulation.MEMORY[27] = "22"
+    simulation.MEMORY[28] = "2a"
+    simulation.MEMORY[29] = "33"
+    simulation.MEMORY[30] = "00"
+    simulation.MEMORY[31] = "22"
+    simulation.MEMORY[32] = "2a"
+    simulation.MEMORY[33] = "33"
+    simulation.MEMORY[34] = "00"
+    simulation.MEMORY[35] = "22"
+    simulation.MEMORY[36] = "2a"
+    simulation.MEMORY[37] = "33"
+    simulation.MEMORY[38] = "00"
+    simulation.MEMORY[39] = "22"
+    simulation.MEMORY[40] = "2a"
+    simulation.MEMORY[41] = "33"
+    simulation.MEMORY[42] = "00"
+    simulation.MEMORY[43] = "22"
+    simulation.MEMORY[44] = "2a"
+    simulation.MEMORY[45] = "33"
+    simulation.MEMORY[46] = "00"
+    simulation.MEMORY[47] = "22"
+
+    simulation.STORAGE["222"] = "333"
+
+    simulation.GLOBAL_STATE["pc"] = 871
+    print(simulation.GLOBAL_STATE["pc"])
+    simulation.STACK.append("444")
+    simulation.STACK.append("7474747")
+    simulation.STACK.append("33")
+    simulation.STACK.append("22")
+    simulation.STACK.append("10")
+    simulation.STACK.append("2")
+    simulation.STACK.append("333")
+    #simulation.STACK.append(str(int("0x4ff2588fF42954bB45127aD4805099796756aCf5",16)))
+    simulation.execute_opcode("SUICIDE", FILE_OPCODES, FILE_PC_OPCODES)
+    print("STACK ---> " + str(simulation.STACK))
+    print("MEMORY --> " + str(simulation.MEMORY))
+    print("STORAGE -> " + str(simulation.STORAGE))
+    print("PC ------> " + str(simulation.GLOBAL_STATE["pc"]))
+    #print(simulation.CONTRACT_PROPERTIES["Ia"]["balance"])
+    #print(simulation.CONTRACT_PROPERTIES["Is"]["balance"])
+    #print(hex(int(simulation.STACK[2])))
+
 
 if __name__ == '__main__':
     main()
