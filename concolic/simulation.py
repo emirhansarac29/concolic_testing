@@ -15,8 +15,8 @@ ETHERSCAN_API = None
 SIMULATION ATOMS
 """
 GLOBAL_STATE= {
-    "currentGas": 1000, # int, GAS
-    "pc": 0             # int
+    "currentGas": 1000,     # int, GAS
+    "pc": 0                 # int
 }
 
 STACK = []              # all int in str format
@@ -26,7 +26,7 @@ STORAGE = {}            # str(int) --> str(int)
 """
 SYMBOLIC SIMULATION ATOMS
 """
-SYM_STACK = []
+SYM_STACK = []          # all kept unsigned
 Symbolic_Solver = Solver()
 """
 USEFUL STUFFS
@@ -82,42 +82,51 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         if(len(SYM_STACK) > 1):
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
-            if (is_all_real(first_arg, second_arg)):
-                result = (first_arg + second_arg) & (UNSIGNED_BOUND_NUMBER)
-                SYM_STACK.append(result)
-            else:
+            result= 0
+
+            if(isReal(first_arg) and is_symbolic(second_arg)):
                 first_arg = to_symbolic(first_arg)
+            elif(is_symbolic(first_arg) and isReal(second_arg)):
                 second_arg = to_symbolic(second_arg)
-                result = simplify(first_arg + second_arg)
-                SYM_STACK.append(result)
+
+            result = (first_arg + second_arg) & (UNSIGNED_BOUND_NUMBER)
+            if(is_expr(result)):
+                result = simplify(result)
+            SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'MUL'):     # DONE
         if (len(SYM_STACK) > 1):
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
-            if (is_all_real(first_arg, second_arg)):
-                result = (first_arg * second_arg) & (UNSIGNED_BOUND_NUMBER)
-                SYM_STACK.append(result)
-            else:
+            result = 0
+
+            if (isReal(first_arg) and is_symbolic(second_arg)):
                 first_arg = to_symbolic(first_arg)
+            elif (is_symbolic(first_arg) and isReal(second_arg)):
                 second_arg = to_symbolic(second_arg)
-                result = simplify(first_arg * second_arg)
-                SYM_STACK.append(result)
+
+            result = (first_arg * second_arg) & (UNSIGNED_BOUND_NUMBER)
+            if (is_expr(result)):
+                result = simplify(result)
+            SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'SUB'):     # DONE
         if (len(SYM_STACK) > 1):
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
-            if (is_all_real(first_arg, second_arg)):
-                result = formed((first_arg - second_arg)) & (UNSIGNED_BOUND_NUMBER)
-                SYM_STACK.append(result)
-            else:
+            result = 0
+
+            if (isReal(first_arg) and is_symbolic(second_arg)):
                 first_arg = to_symbolic(first_arg)
+            elif (is_symbolic(first_arg) and isReal(second_arg)):
                 second_arg = to_symbolic(second_arg)
-                result = simplify(first_arg - second_arg)
-                SYM_STACK.append(result)
+
+            result = (first_arg - second_arg) & (UNSIGNED_BOUND_NUMBER)
+            if (is_expr(result)):
+                result = simplify(result)
+            SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'DIV'):     # DONE
@@ -129,6 +138,8 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 if (second_arg == 0):
                     result = 0
                 else:
+                    first_arg = to_unsigned(first_arg)
+                    second_arg = to_unsigned(second_arg)
                     result = (first_arg // second_arg) & (UNSIGNED_BOUND_NUMBER)
                 SYM_STACK.append(result)
             else:
@@ -164,7 +175,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                     if ((first_arg // second_arg) >= 0):
                         sign = 1
                     result = sign * (abs(first_arg) // abs(second_arg))
-                STACK.append(formed(result))
+                SYM_STACK.append(to_unsigned(result))
             else:
                 first_arg = to_symbolic(first_arg)
                 second_arg = to_symbolic(second_arg)
@@ -179,9 +190,10 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                         result = -2**255
                     else:
                         Symbolic_Solver.push()                  # NEED FURTHER LOOK
-                        Symbolic_Solver.add(first_arg / second_arg < 0)
+                        #Symbolic_Solver.add(first_arg / second_arg < 0)
+                        Symbolic_Solver.add(Or(And(first_arg<0,second_arg>0),And(first_arg>0,second_arg<0)))   #TODO ask?
                         sign = 1
-                        if (check_sat() == z3.sat):
+                        if (check_sat() == z3.sat):             # TODO takes so much time
                             sign = -1
                         z3_abs = lambda x: If(x >= 0, x, -x)
                         first_arg = z3_abs(first_arg)
@@ -205,6 +217,8 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 if (second_arg == 0):
                     result = 0
                 else:
+                    first_arg = to_unsigned(first_arg)
+                    second_arg = to_unsigned(second_arg)
                     result = (first_arg % second_arg) & (UNSIGNED_BOUND_NUMBER)
                 SYM_STACK.append(result)
             else:
@@ -237,8 +251,8 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                     sign = -1
                     if (first_arg >= 0):
                         sign = 1
-                    result = sign * (abs(first_arg) // abs(second_arg))
-                SYM_STACK.append(formed(result))
+                    result = sign * (abs(first_arg) % abs(second_arg))
+                SYM_STACK.append(to_unsigned(result))
             else:
                 first_arg = to_symbolic(first_arg)
                 second_arg = to_symbolic(second_arg)
@@ -265,38 +279,66 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'ADDMOD'):  # HERE I AM
-        if (len(STACK) > 2):
+        if (len(SYM_STACK) > 2):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = int(STACK.pop())
-            second_arg = int(STACK.pop())
-            third_arg = int(STACK.pop())
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            third_arg = SYM_STACK.pop()
             result = 0
-            if (third_arg != 0):
-                result = (first_arg + second_arg) % (third_arg)
-            STACK.append(str(result))
+            if (is_all_real(first_arg, second_arg, third_arg)):
+                if (third_arg == 0):
+                    result = 0
+                else:
+                    result = ((first_arg + second_arg) % third_arg)
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                third_arg = to_symbolic(third_arg)
+                Symbolic_Solver.push()
+                Symbolic_Solver.add(Not(third_arg == 0))
+                if (check_sat() == z3.unsat):
+                    result = 0
+                else:
+                    first_arg = ZeroExt(256, first_arg)
+                    second_arg = ZeroExt(256, second_arg)
+                    third_arg = ZeroExt(256, third_arg)
+                    result = (first_arg + second_arg) % third_arg
+                    result = Extract(255, 0, result)
+                Symbolic_Solver.pop()
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'MULMOD'):  # DONE
-        if (len(STACK) > 2):
+        if (len(SYM_STACK) > 2):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = int(STACK.pop())
-            second_arg = int(STACK.pop())
-            third_arg = int(STACK.pop())
+            first_arg = int(SYM_STACK.pop())
+            second_arg = int(SYM_STACK.pop())
+            third_arg = int(SYM_STACK.pop())
             result = 0
             if (third_arg != 0):
                 result = (first_arg * second_arg) % (third_arg)
-            STACK.append(str(result))
+            SYM_STACK.append(str(result))
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'EXP'):     # DONE
-        if (len(STACK) > 1):
+        if (len(SYM_STACK) > 1):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = int(STACK.pop())
-            second_arg = int(STACK.pop())
+            first_arg = int(SYM_STACK.pop())
+            second_arg = int(SYM_STACK.pop())
             result = (first_arg ** second_arg) & UNSIGNED_BOUND_NUMBER
-            STACK.append(str(result))
+            SYM_STACK.append(str(result))
         else:
             raise ValueError('STACK underflow')
+    elif (opcode.startswith('PUSH', 0)):    # DONE
+        position = int(opcode[4:], 10)
+        old_pc = GLOBAL_STATE["pc"]
+        index = FILE_PC_OPCODES.index(old_pc)
+        result = FILE_OPCODES[index].par
+        SYM_STACK.append(result)
 """
 444 --> STOP
 222 --> STACK UNDERFLOW
@@ -330,7 +372,7 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = int(STACK.pop())
             second_arg = int(STACK.pop())
-            result = formed((first_arg - second_arg)) & (UNSIGNED_BOUND_NUMBER)
+            result = to_unsigned((first_arg - second_arg)) & (UNSIGNED_BOUND_NUMBER)
             STACK.append(str(result))
         else:
             raise ValueError('STACK underflow')
@@ -359,7 +401,7 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 sign = -1
                 if ((first_arg // second_arg) > 0):
                     sign = 1
-                result = formed(sign * (abs(first_arg) // abs(second_arg)))
+                result = to_unsigned(sign * (abs(first_arg) // abs(second_arg)))
             STACK.append(str(result))
         else:
             raise ValueError('STACK underflow')
@@ -384,7 +426,7 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 sign = -1
                 if (first_arg >= 0):
                     sign = 1
-                result = formed(sign * (abs(first_arg) % abs(second_arg)))
+                result = to_unsigned(sign * (abs(first_arg) % abs(second_arg)))
             STACK.append(str(result))
         else:
             raise ValueError('STACK underflow')
@@ -948,7 +990,7 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
     else:   # DONE
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
 
-def formed(num):
+def to_unsigned(num):
     if(num < 0):
         return NEGATIVE_BOUND_NUMBER + num
     return num
@@ -978,6 +1020,9 @@ def to_symbolic(number):
     if (is_symbolic(number)):
         return number
     return BitVecVal(number, 256)
+
+def isReal(value):
+    return isinstance(value, six.integer_types)
 
 def check_sat(pop_if_exception=True):
     try:

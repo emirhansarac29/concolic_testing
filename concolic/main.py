@@ -4,10 +4,12 @@ import math
 import os
 import sys
 import re
+import six
+from z3 import *
+
 import opcodes
 import basicblock
 import simulation
-
 
 class OPCODE:
     def __init__(self, name, par):
@@ -129,12 +131,10 @@ def find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES):
 
     return parameters
 
-
 """
 solc --bin-runtime asd.sol > bin.txt
 solc --optimize --opcodes asd.sol 
 """
-
 
 def main():
     if (len(sys.argv) != 2):
@@ -224,24 +224,42 @@ def main():
 
     simulation.STORAGE["222"] = "333"
 
-    simulation.GLOBAL_STATE["pc"] = 871
+    simulation.GLOBAL_STATE["pc"] = 881
     print(simulation.GLOBAL_STATE["pc"])
-    simulation.STACK.append("444")
-    simulation.STACK.append("7474747")
-    simulation.STACK.append("33")
-    simulation.STACK.append("22")
-    simulation.STACK.append("10")
-    simulation.STACK.append("2")
-    simulation.STACK.append("333")
+    x = z3.BitVec('x', 256)
+    y = z3.BitVec('y', 256)
+    simulation.SYM_STACK.append(x - 5)
+    simulation.SYM_STACK.append(2)
+    simulation.SYM_STACK.append(3)
+    simulation.SYM_STACK.append(x+y)
+    simulation.SYM_STACK.append(x - 5)
+    simulation.SYM_STACK.append(y)
+    simulation.symbolic_execute_opcode("SDIV", FILE_OPCODES, FILE_PC_OPCODES)
+    simulation.symbolic_execute_opcode("SDIV", FILE_OPCODES, FILE_PC_OPCODES)
+
+    print("SYM_STACK ---> " + str(simulation.SYM_STACK))
     #simulation.STACK.append(str(int("0x4ff2588fF42954bB45127aD4805099796756aCf5",16)))
-    simulation.execute_opcode("SUICIDE", FILE_OPCODES, FILE_PC_OPCODES)
-    print("STACK ---> " + str(simulation.STACK))
-    print("MEMORY --> " + str(simulation.MEMORY))
-    print("STORAGE -> " + str(simulation.STORAGE))
-    print("PC ------> " + str(simulation.GLOBAL_STATE["pc"]))
+    #simulation.execute_opcode("SUICIDE", FILE_OPCODES, FILE_PC_OPCODES)
+    #print("STACK ---> " + str(simulation.STACK))
+    #print("MEMORY --> " + str(simulation.MEMORY))
+    #print("STORAGE -> " + str(simulation.STORAGE))
+    #print("PC ------> " + str(simulation.GLOBAL_STATE["pc"]))
     #print(simulation.CONTRACT_PROPERTIES["Ia"]["balance"])
     #print(simulation.CONTRACT_PROPERTIES["Is"]["balance"])
-    #print(hex(int(simulation.STACK[2])))
+
+    a1 = z3.BitVec('x', 256)
+    a2 = z3.BitVec('y', 256)
+    a3 = z3.BitVec('z', 256)
+    a4 = z3.BitVec('t', 256)
+
+    t = simulation.SYM_STACK.pop()
+    ss = Solver()
+    #ss.add(t == 10)
+    #ss.check()
+    #print(ss.model())
+
+
+
 
 
 if __name__ == '__main__':
