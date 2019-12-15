@@ -6,6 +6,7 @@ import sys
 import re
 import six
 from z3 import *
+import generator
 
 import opcodes
 import basicblock
@@ -228,14 +229,15 @@ def main():
     print(simulation.GLOBAL_STATE["pc"])
     x = z3.BitVec('x', 256)
     y = z3.BitVec('y', 256)
+    z = z3.BitVec('z', 256)
     simulation.SYM_STACK.append(x - 5)
     simulation.SYM_STACK.append(2)
     simulation.SYM_STACK.append(3)
-    simulation.SYM_STACK.append(x+y)
-    simulation.SYM_STACK.append(x - 5)
+    simulation.SYM_STACK.append(z)
     simulation.SYM_STACK.append(y)
-    simulation.symbolic_execute_opcode("SDIV", FILE_OPCODES, FILE_PC_OPCODES)
-    simulation.symbolic_execute_opcode("SDIV", FILE_OPCODES, FILE_PC_OPCODES)
+    simulation.SYM_STACK.append(x)
+    simulation.symbolic_execute_opcode("LOG1", FILE_OPCODES, FILE_PC_OPCODES)
+    #simulation.symbolic_execute_opcode("SDIV", FILE_OPCODES, FILE_PC_OPCODES)
 
     print("SYM_STACK ---> " + str(simulation.SYM_STACK))
     #simulation.STACK.append(str(int("0x4ff2588fF42954bB45127aD4805099796756aCf5",16)))
@@ -254,12 +256,26 @@ def main():
 
     t = simulation.SYM_STACK.pop()
     ss = Solver()
-    #ss.add(t == 10)
-    #ss.check()
-    #print(ss.model())
+    ss.add(t == 4)
+    print(ss.check())
+    model = ss.model()
+    print(model)
 
-
-
+    print(2**255)
+    print(2**256)
+    xxx = int(str(model[x]))
+    s_xxx = simulation.to_signed(xxx)
+    yyy = int(str(model[y]))
+    s_yyy = simulation.to_signed(yyy)
+    #zzz = int(str(model[z]))
+    #s_zzz = simulation.to_signed(zzz)
+    print("X --> " + str(xxx))
+    print("X --> " + str(s_xxx))
+    print("Y --> " + str(yyy))
+    print("Y --> " + str(s_yyy))
+    #print("Z --> " + str(zzz))
+    #print("Z --> " + str(s_zzz))
+    #print((xxx*yyy)%zzz)
 
 
 if __name__ == '__main__':

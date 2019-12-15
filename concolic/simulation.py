@@ -5,10 +5,11 @@ from ethereum_data import *
 from z3 import *
 import helper
 import six
+import generator
 """
 INITIALIZATION
 """
-
+GENERATOR = generator.Generator()
 ETHERSCAN_API = None
 
 """
@@ -27,6 +28,8 @@ STORAGE = {}            # str(int) --> str(int)
 SYMBOLIC SIMULATION ATOMS
 """
 SYM_STACK = []          # all kept unsigned
+SYM_MEMORY = helper.GrowingList()
+SYM_STORAGE = {}
 Symbolic_Solver = Solver()
 """
 USEFUL STUFFS
@@ -143,15 +146,12 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                     result = (first_arg // second_arg) & (UNSIGNED_BOUND_NUMBER)
                 SYM_STACK.append(result)
             else:
+                if(isReal(second_arg) and second_arg == 0):
+                    SYM_STACK.append(0)
+                    return
                 first_arg = to_symbolic(first_arg)
                 second_arg = to_symbolic(second_arg)
-                Symbolic_Solver.push()
-                Symbolic_Solver.add(Not(second_arg == 0))
-                if check_sat() == z3.unsat:
-                    result = 0
-                else:
-                    result = UDiv(first_arg, second_arg)
-                Symbolic_Solver.pop()
+                result = UDiv(first_arg, second_arg)
                 if (is_symbolic(result)):
                     SYM_STACK.append(simplify(result))
                 else:
@@ -177,31 +177,12 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                     result = sign * (abs(first_arg) // abs(second_arg))
                 SYM_STACK.append(to_unsigned(result))
             else:
+                if (isReal(second_arg) and second_arg == 0):
+                    SYM_STACK.append(0)
+                    return
                 first_arg = to_symbolic(first_arg)
                 second_arg = to_symbolic(second_arg)
-                Symbolic_Solver.push()
-                Symbolic_Solver.add(Not(second_arg == 0))
-                if check_sat() == z3.unsat:
-                    result = 0
-                else:
-                    Symbolic_Solver.push()
-                    Symbolic_Solver.add(Not(And(first_arg == -2**255, second_arg == -1)))
-                    if check_sat() == z3.unsat:
-                        result = -2**255
-                    else:
-                        Symbolic_Solver.push()                  # NEED FURTHER LOOK
-                        #Symbolic_Solver.add(first_arg / second_arg < 0)
-                        Symbolic_Solver.add(Or(And(first_arg<0,second_arg>0),And(first_arg>0,second_arg<0)))   #TODO ask?
-                        sign = 1
-                        if (check_sat() == z3.sat):             # TODO takes so much time
-                            sign = -1
-                        z3_abs = lambda x: If(x >= 0, x, -x)
-                        first_arg = z3_abs(first_arg)
-                        second_arg = z3_abs(second_arg)
-                        result = sign * (first_arg / second_arg)
-                        Symbolic_Solver.pop()
-                    Symbolic_Solver.pop()
-                Symbolic_Solver.pop()
+                result = (first_arg / second_arg)
                 if (is_symbolic(result)):
                     SYM_STACK.append(simplify(result))
                 else:
@@ -222,15 +203,12 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                     result = (first_arg % second_arg) & (UNSIGNED_BOUND_NUMBER)
                 SYM_STACK.append(result)
             else:
+                if (isReal(second_arg) and second_arg == 0):
+                    SYM_STACK.append(0)
+                    return
                 first_arg = to_symbolic(first_arg)
                 second_arg = to_symbolic(second_arg)
-                Symbolic_Solver.push()
-                Symbolic_Solver.add(Not(second_arg == 0))
-                if (check_sat() == z3.unsat):
-                    result = 0
-                else:
-                    result = URem(first_arg, second_arg)
-                Symbolic_Solver.pop()
+                result = URem(first_arg, second_arg)
                 if (is_symbolic(result)):
                     SYM_STACK.append(simplify(result))
                 else:
@@ -254,33 +232,20 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                     result = sign * (abs(first_arg) % abs(second_arg))
                 SYM_STACK.append(to_unsigned(result))
             else:
+                if (isReal(second_arg) and second_arg == 0):
+                    SYM_STACK.append(0)
+                    return
                 first_arg = to_symbolic(first_arg)
                 second_arg = to_symbolic(second_arg)
-                Symbolic_Solver.push()
-                Symbolic_Solver.add(Not(second_arg == 0))
-                if (check_sat() == z3.unsat):
-                    result = 0
-                else:
-                    Symbolic_Solver.push()
-                    Symbolic_Solver.add(first_arg < 0)
-                    sign = 1
-                    if(check_sat() == z3.sat):
-                        sign = -1
-                    Symbolic_Solver.pop()
-                    z3_abs = lambda x: If(x >= 0, x, -x)
-                    first_arg = z3_abs(first_arg)
-                    second_arg = z3_abs(second_arg)
-                    result = sign * (first_arg % second_arg)
-                Symbolic_Solver.pop()
+                result = SRem(first_arg, second_arg)
                 if (is_symbolic(result)):
                     SYM_STACK.append(simplify(result))
                 else:
                     SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
-    elif (opcode == 'ADDMOD'):  # HERE I AM
+    elif (opcode == 'ADDMOD'):  # DONE
         if (len(SYM_STACK) > 2):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
             third_arg = SYM_STACK.pop()
@@ -292,20 +257,17 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                     result = ((first_arg + second_arg) % third_arg)
                 SYM_STACK.append(result)
             else:
+                if (isReal(third_arg) and third_arg == 0):
+                    SYM_STACK.append(0)
+                    return
                 first_arg = to_symbolic(first_arg)
                 second_arg = to_symbolic(second_arg)
                 third_arg = to_symbolic(third_arg)
-                Symbolic_Solver.push()
-                Symbolic_Solver.add(Not(third_arg == 0))
-                if (check_sat() == z3.unsat):
-                    result = 0
-                else:
-                    first_arg = ZeroExt(256, first_arg)
-                    second_arg = ZeroExt(256, second_arg)
-                    third_arg = ZeroExt(256, third_arg)
-                    result = (first_arg + second_arg) % third_arg
-                    result = Extract(255, 0, result)
-                Symbolic_Solver.pop()
+                first_arg = ZeroExt(256, first_arg)
+                second_arg = ZeroExt(256, second_arg)
+                third_arg = ZeroExt(256, third_arg)
+                result = URem((first_arg + second_arg), third_arg)
+                result = Extract(255, 0, result)
                 if (is_symbolic(result)):
                     SYM_STACK.append(simplify(result))
                 else:
@@ -314,31 +276,685 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             raise ValueError('STACK underflow')
     elif (opcode == 'MULMOD'):  # DONE
         if (len(SYM_STACK) > 2):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = int(SYM_STACK.pop())
-            second_arg = int(SYM_STACK.pop())
-            third_arg = int(SYM_STACK.pop())
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            third_arg = SYM_STACK.pop()
             result = 0
-            if (third_arg != 0):
-                result = (first_arg * second_arg) % (third_arg)
-            SYM_STACK.append(str(result))
+            if (is_all_real(first_arg, second_arg, third_arg)):
+                if (third_arg == 0):
+                    result = 0
+                else:
+                    result = ((first_arg * second_arg) % third_arg)
+                SYM_STACK.append(result)
+            else:
+                if (isReal(third_arg) and third_arg == 0):
+                    SYM_STACK.append(0)
+                    return
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                third_arg = to_symbolic(third_arg)
+                #first_arg = ZeroExt(256, first_arg) Disabled since takes too much time
+                #second_arg = ZeroExt(256, second_arg)
+                #third_arg = ZeroExt(256, third_arg)
+                result = URem((first_arg * second_arg), third_arg)
+                #result = Extract(255, 0, result)
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'EXP'):     # DONE
         if (len(SYM_STACK) > 1):
-            GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
-            first_arg = int(SYM_STACK.pop())
-            second_arg = int(SYM_STACK.pop())
-            result = (first_arg ** second_arg) & UNSIGNED_BOUND_NUMBER
-            SYM_STACK.append(str(result))
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg, second_arg)):
+                result = (first_arg ** second_arg) & UNSIGNED_BOUND_NUMBER
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = BitVec(GENERATOR.gen_arbitrary_var(), 256)
+                SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
+    elif (opcode == 'SIGNEXTEND'):  # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg, second_arg)):
+                if first_arg >= 32 or first_arg < 0:
+                    result = second_arg
+                else:
+                    signbit_index_from_right = 8 * first_arg + 7
+                    if second_arg & (1 << signbit_index_from_right):
+                        result = second_arg | (2 ** 256 - (1 << signbit_index_from_right))
+                    else:
+                        result = second_arg & ((1 << signbit_index_from_right) - 1)
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                signbit_index_from_right = 8 * first_arg + 7
+                z3_s_ext = lambda x: If(x & (1 << signbit_index_from_right) == 0, x & ((1 << signbit_index_from_right) - 1 ), x | (2 ** 256 - (1 << signbit_index_from_right)))
+                result = z3_s_ext(second_arg)
+
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'LT'):  # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg, second_arg)):
+                if(first_arg < second_arg):
+                    result = 1
+                else:
+                    result = 0
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = If(ULT(first_arg, second_arg), BitVecVal(1, 256), BitVecVal(0, 256))
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'GT'):  # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg, second_arg)):
+                if (first_arg > second_arg):
+                    result = 1
+                else:
+                    result = 0
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = If(UGT(first_arg, second_arg), BitVecVal(1, 256), BitVecVal(0, 256))
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'SLT'):  # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg, second_arg)):
+                first_arg = to_signed(first_arg)
+                second_arg = to_signed(second_arg)
+                if (first_arg < second_arg):
+                    result = 1
+                else:
+                    result = 0
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = If(first_arg < second_arg, BitVecVal(1, 256), BitVecVal(0, 256))
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'SGT'):  # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg, second_arg)):
+                first_arg = to_signed(first_arg)
+                second_arg = to_signed(second_arg)
+                if (first_arg > second_arg):
+                    result = 1
+                else:
+                    result = 0
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = If(first_arg > second_arg, BitVecVal(1, 256), BitVecVal(0, 256))
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'EQ'):  # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg, second_arg)):
+                if (first_arg == second_arg):
+                    result = 1
+                else:
+                    result = 0
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = If(first_arg == second_arg, BitVecVal(1, 256), BitVecVal(0, 256))
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'ISZERO'):  # DONE
+        if (len(SYM_STACK) > 0):
+            first_arg = SYM_STACK.pop()
+            result = 0
+            if (is_all_real(first_arg)):
+                if (first_arg == 0):
+                    result = 1
+                else:
+                    result = 0
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                result = If(first_arg == 0, BitVecVal(1, 256), BitVecVal(0, 256))
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'AND'):  # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg, second_arg)):
+                result = first_arg & second_arg
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = first_arg & second_arg
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'OR'):  # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg, second_arg)):
+                result = first_arg | second_arg
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = first_arg | second_arg
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'XOR'):  # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg, second_arg)):
+                result = first_arg ^ second_arg
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = first_arg ^ second_arg
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'NOT'):  # DONE
+        if (len(SYM_STACK) > 0):
+            first_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg)):
+                result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                result = (~first_arg) & UNSIGNED_BOUND_NUMBER
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'BYTE'):  # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg, second_arg)):
+                result = 0
+                if (first_arg < 32 and first_arg >= 0):
+                    result = (second_arg >> (248 - (first_arg * 8))) & BYTE_BOUND_NUMBER
+                SYM_STACK.append(result)
+            else:
+                first_arg = to_symbolic(first_arg)
+                second_arg = to_symbolic(second_arg)
+                result = (second_arg >> (248 - (first_arg * 8))) & BYTE_BOUND_NUMBER
+                if (is_symbolic(result)):
+                    SYM_STACK.append(simplify(result))
+                else:
+                    SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'KECCAK256'):   # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg, second_arg)):
+                data = read_from_mem_sym(first_arg, second_arg)
+                hashed = Web3.sha3(data)
+                hashed_hex = Web3.toHex(hashed)
+                result = int(hashed_hex,16)
+                #result = int(hashed_hex)
+                SYM_STACK.append(result)
+            else:
+                result = BitVec(GENERATOR.gen_arbitrary_var(), 256)
+                SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'ADDRESS'):     # DONE
+        result = CONTRACT_PROPERTIES['Ia']['address']
+        result = int(result,16)
+        SYM_STACK.append(result)
+    elif (opcode == 'BALANCE'):     # DONE
+        if len(SYM_STACK) > 0:
+            first_arg = hex(SYM_STACK.pop())
+            if (is_all_real(first_arg)):
+                result = ETHERSCAN_API.getBalance(str(first_arg))   ## returns str
+                SYM_STACK.append(int(result))
+            else:
+                result = BitVec(GENERATOR.gen_balance_var(), 256)
+                SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'ORIGIN'):      # DONE
+        result = CONTRACT_PROPERTIES['exec']['origin']
+        result = int(result,16)
+        SYM_STACK.append(result)
+    elif (opcode == 'CALLER'):      # DONE
+        result = CONTRACT_PROPERTIES["Is"]["address"]
+        result = int(result, 16)
+        SYM_STACK.append(result)
+    elif (opcode == 'CALLVALUE'):   # DONE
+        result = CONTRACT_PROPERTIES['exec']['value']
+        result = int(result, 16)
+        SYM_STACK.append(result)
+    elif (opcode == 'CALLDATALOAD'):    # DONE
+        if (len(SYM_STACK) > 0):
+            first_arg = SYM_STACK.pop()
+            data = CONTRACT_PROPERTIES['exec']['calldata']
+            if(is_all_real(first_arg)):
+                result = data[(2+2*first_arg):(66+2*first_arg)]
+                result = int(result,16)
+                STACK.append(result)
+            else:
+                result = BitVec(GENERATOR.gen_data_var(), 256)
+                SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'CALLDATASIZE'):    # DONE
+        result = BitVec(GENERATOR.gen_data_size(), 256)
+        SYM_STACK.append(result)
+    elif (opcode == 'CALLDATACOPY'):    # DONE
+        if (len(SYM_STACK) > 2):
+            first_arg = STACK.pop()
+            second_arg = STACK.pop()
+            third_arg = STACK.pop()
+            # NO WAY OF SIMULATION
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'CODESIZE'):        # DONE
+        f = open('bin.txt', 'r')
+        bin_file = f.read()
+        f.close()
+        index = bin_file.index('part:')
+        bin_file = bin_file[index + 7:][:-1]
+        result = int(len(bin_file)/2)
+        SYM_STACK.append(result)
+    elif (opcode == 'CODECOPY'):        # DONE
+        if (len(SYM_STACK) > 2):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            third_arg = SYM_STACK.pop()
+
+            if(is_all_real(first_arg, second_arg, third_arg)):
+                f = open('bin.txt', 'r')
+                bin_file = f.read()
+                f.close()
+                index = bin_file.index('part:')
+                bin_file = bin_file[index + 7:][:-1]
+
+                for count in range(0, third_arg):
+                    MEMORY[first_arg + count] = str(bin_file[2*(second_arg + count)]) + str(bin_file[2*(second_arg + count) + 1])
+            else:
+                dont_know = 1
+                # Dont know what to do
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'GASPRICE'):        # DONE
+        result = CONTRACT_PROPERTIES['exec']['gasPrice']
+        result = int(result, 16)
+        SYM_STACK.append(result)
+    elif (opcode == 'EXTCODESIZE'):     # DONE
+        if (len(SYM_STACK) > 0):
+            first_arg = SYM_STACK.pop()
+            if(is_all_real(first_arg)):
+                first_arg = hex(first_arg)
+                result = int(len(ETHERSCAN_API.getCode(str(first_arg))) - 2)/2
+                SYM_STACK.append(result)
+            else:
+                result = BitVec(GENERATOR.gen_code_size_var(first_arg), 256)    ## TODO suspicious about this
+                SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'EXTCODECOPY'):     # DONE
+        if (len(SYM_STACK) > 3):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            third_arg = SYM_STACK.pop()
+            fourth_arg = SYM_STACK.pop()
+            if(is_all_real(first_arg, second_arg, third_arg, fourth_arg)):
+                code = ETHERSCAN_API.getCode(str(hex(first_arg)))[2:]
+                for count in range(0, fourth_arg):
+                    MEMORY[second_arg + count] = str(code[2*(third_arg + count)]) + str(code[2*(third_arg + count) + 1])
+            else:
+                dont_know = 1
+                # Dont know what to do
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'BLOCKHASH'):       # NOT COMPLETE YET
+        if (len(SYM_STACK) > 0):
+            SYM_STACK.pop()
+            result = CONTRACT_PROPERTIES["IH_BLOCKHASH"]
+            result = int(result, 16)
+            SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'COINBASE'):        # DONE
+        result = CONTRACT_PROPERTIES['env']['currentCoinbase']
+        result = int(result, 16)
+        SYM_STACK.append(result)
+    elif (opcode == 'TIMESTAMP'):       # DONE
+        result = CONTRACT_PROPERTIES['env']['currentTimestamp']
+        result = int(result, 16)
+        SYM_STACK.append(result)
+    elif (opcode == 'NUMBER'):          # DONE
+        result = CONTRACT_PROPERTIES['env']['currentNumber']
+        result = int(result, 16)
+        SYM_STACK.append(result)
+    elif (opcode == 'DIFFICULTY'):      # DONE
+        result = CONTRACT_PROPERTIES['env']['currentDifficulty']
+        result = int(result, 16)
+        SYM_STACK.append(result)
+    elif (opcode == 'GASLIMIT'):        # DONE
+        result = CONTRACT_PROPERTIES['env']['currentGasLimit']
+        result = int(result, 16)
+        SYM_STACK.append(result)
+    elif (opcode == 'POP'):             # DONE
+        if (len(SYM_STACK) > 0):
+            first_arg = SYM_STACK.pop()
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'MLOAD'):           # DONE
+        if (len(SYM_STACK) > 0):
+            first_arg = STACK.pop()
+            if(is_all_real(first_arg)):
+                k = ""
+                for i in range(0, 32):
+                    k = k + MEMORY[first_arg + i]
+                result = int(k,16)
+                SYM_STACK.append(result)
+            else:
+                result = BitVec(GENERATOR.gen_mem_var(first_arg), 256)
+                SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'MSTORE'):          # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if(is_all_real(first_arg, second_arg)):
+                second_arg = str(hex(second_arg))[2:]
+                len_arg = len(second_arg)
+                if(len_arg < 64):
+                    dif = 64 - len_arg
+                    second_arg = "0"*dif + second_arg
+
+                for i in range(0, 32):
+                    MEMORY[first_arg + i] = second_arg[2*i:2*i + 2]
+            else:
+                dont_know = 1
+                # Dont know what to do
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'MSTORE8'):         # DONE
+        if (len(SYM_STACK) > 0):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if(is_all_real(first_arg, second_arg)):
+                MEMORY[first_arg] = str(hex(second_arg & 0xFF))[2:]
+            else:
+                dont_know = 1
+                # Dont know what to do
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'SLOAD'):           # DONE
+        if (len(SYM_STACK) > 0):
+            first_arg = SYM_STACK.pop()
+            if(is_all_real(first_arg)):
+                result = STORAGE[first_arg]
+                SYM_STACK.append(result)
+            else:
+                result = BitVec(GENERATOR.gen_owner_store_var(first_arg), 256)
+                SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'SSTORE'):          # DONE
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if (is_all_real(first_arg)):
+                STORAGE[first_arg] = second_arg
+            else:
+                STORAGE[str(first_arg)] = second_arg
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'JUMP'):            # DONE
+        if (len(SYM_STACK) > 0):
+            first_arg = SYM_STACK.pop()
+            if(not(is_all_real(first_arg))):
+                raise ValueError('JUMP ADDRESS SHOULD BE INTEGER')
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'JUMPI'):           # DONE          True --> '1' , False --> '0'
+        if (len(SYM_STACK) > 1):
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            if(not(is_all_real(first_arg, second_arg))):
+                will_do= 1
+               ## TODO TREE CONSTRUCTION
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'PC'):              # DONE
+        result = GLOBAL_STATE["pc"]
+        SYM_STACK.append(result)
+    elif (opcode == 'MSIZE'):           # DONE BUT NOT SURE --> NOT COMPLETE and len cannot be true one!!!
+        result = len(MEMORY)
+        SYM_STACK.append(result)
+    elif (opcode == 'GAS'):             # DONE
+        result = BitVec(GENERATOR.gen_gas_var(), 256)
+        SYM_STACK.append(result)
+    elif (opcode == 'JUMPDEST'):        # DONE
+        dont_do_anything = 1
     elif (opcode.startswith('PUSH', 0)):    # DONE
         position = int(opcode[4:], 10)
         old_pc = GLOBAL_STATE["pc"]
         index = FILE_PC_OPCODES.index(old_pc)
         result = FILE_OPCODES[index].par
         SYM_STACK.append(result)
+    elif (opcode.startswith("DUP", 0)):     # DONE
+        position = int(opcode[3:], 10)
+        if(len(SYM_STACK) > position-1):
+            result = SYM_STACK[len(SYM_STACK)-position]
+            SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode.startswith("SWAP", 0)):    # DONE
+        position = int(opcode[4:], 10)
+        if (len(SYM_STACK) > position):
+            temp = SYM_STACK[len(SYM_STACK) - 1 - position]
+            SYM_STACK[len(SYM_STACK) - 1 - position] = SYM_STACK[len(SYM_STACK) - 1]
+            SYM_STACK[len(SYM_STACK) - 1] = temp
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode.startswith("LOG", 0)):     # DONE
+        position = int(opcode[3:], 10)
+        if(len(SYM_STACK) > position + 1):
+            for a in range(0, position+2):
+                SYM_STACK.pop()
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'CREATE'):      # DONE
+        if (len(SYM_STACK) > 2):
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+
+            result = BitVec(GENERATOR.gen_arbitrary_var(), 256)
+            SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'CALL'):        # DONE
+        if (len(SYM_STACK) > 6):
+            outgas = SYM_STACK.pop()
+            recipient = SYM_STACK.pop()
+            transfer_amount = SYM_STACK.pop()
+            start_data_input = SYM_STACK.pop()
+            size_data_input = SYM_STACK.pop()
+            start_data_output = SYM_STACK.pop()
+            size_data_ouput = SYM_STACK.pop()
+
+            if(is_all_real(transfer_amount)):
+                balance = int(CONTRACT_PROPERTIES["Ia"]["balance"],16)
+                is_enough_fund = (transfer_amount <= balance)
+
+                if(is_enough_fund):
+                    CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
+                    CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(CONTRACT_PROPERTIES["Is"]["balance"],16) + transfer_amount))
+                    SYM_STACK.append(1)
+                else:
+                    SYM_STACK.append(0)
+            else:
+                SYM_STACK.append(1)     ## Guessing possibly okay
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'CALLCODE'):    # DONE
+        if (len(SYM_STACK) > 6):
+            outgas = SYM_STACK.pop()
+            recipient = SYM_STACK.pop()
+            transfer_amount = SYM_STACK.pop()
+            start_data_input = SYM_STACK.pop()
+            size_data_input = SYM_STACK.pop()
+            start_data_output = SYM_STACK.pop()
+            size_data_ouput = SYM_STACK.pop()
+
+            if (is_all_real(transfer_amount)):
+                balance = int(CONTRACT_PROPERTIES["Ia"]["balance"], 16)
+                is_enough_fund = (transfer_amount <= balance)
+
+                if (is_enough_fund):
+                    CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
+                    CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(CONTRACT_PROPERTIES["Is"]["balance"], 16) + transfer_amount))
+                    SYM_STACK.append(1)
+                else:
+                    SYM_STACK.append(0)
+            else:
+                SYM_STACK.append(1)  ## Guessing possibly okay
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'RETURN'):  # DONE
+        if (len(SYM_STACK) > 1):
+            SYM_STACK.pop()
+            SYM_STACK.pop()         # TODO What happens to returned value, where it kept
+            return 444
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'DELEGATECALL'):    # DONE
+        if (len(SYM_STACK) > 5):
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            result = BitVec(GENERATOR.gen_arbitrary_var(), 256)
+            SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'CALLBLACKBOX'):    # DONE
+        if (len(SYM_STACK) > 4):
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            result = BitVec(GENERATOR.gen_arbitrary_var(), 256)
+            SYM_STACK.append(result) #address
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'STATICCALL'):  # DONE
+        if (len(SYM_STACK) > 5):
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            result = BitVec(GENERATOR.gen_arbitrary_var(), 256)
+            SYM_STACK.append(result)
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'REVERT'):  # DONE
+        if (len(SYM_STACK) > 1):
+            SYM_STACK.pop()
+            SYM_STACK.pop()
+            return 444
+        else:
+            raise ValueError('STACK underflow')
+    elif (opcode == 'INVALID'): # DONE
+        return 111
+    elif (opcode == 'SUICIDE'): # DONE
+        if (len(SYM_STACK) > 0):
+            SYM_STACK.pop()
+            #transfer_amount = CONTRACT_PROPERTIES["Ia"]["balance"] = int(balance - transfer_amount, 16)
+            CONTRACT_PROPERTIES["Ia"]["balance"] = "0x0"
+            return 444
+        else:
+            raise ValueError('STACK underflow')
+
 """
 444 --> STOP
 222 --> STACK UNDERFLOW
@@ -707,7 +1323,7 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             third_arg = int(STACK.pop())
             fourth_arg = int(STACK.pop())
 
-            code = ETHERSCAN_API.getCode(str(first_arg))[2:]
+            code = ETHERSCAN_API.getCode(str(hex(first_arg)))[2:]
 
             for count in range(0, fourth_arg):
                 MEMORY[second_arg + count] = str(code[2*(third_arg + count)]) + str(code[2*(third_arg + count) + 1])
@@ -848,8 +1464,8 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
         position = int(opcode[3:], 10)
         if(len(STACK) > position-1):
-            first_arg = STACK[len(STACK)-position]
-            STACK.append(first_arg)
+            result = STACK[len(STACK)-position]
+            STACK.append(result)
         else:
             raise ValueError('STACK underflow')
     elif (opcode.startswith("SWAP", 0)):    # DONE
@@ -1001,6 +1617,12 @@ def to_signed(num):
     return num
 
 def read_from_mem(offset, length):
+    ret = ""
+    for a in range(0,length):
+        ret = ret + MEMORY[offset + a]
+    return int(ret, 16)
+
+def read_from_mem_sym(offset, length):
     ret = ""
     for a in range(0,length):
         ret = ret + MEMORY[offset + a]
