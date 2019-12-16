@@ -11,6 +11,8 @@ INITIALIZATION
 """
 GENERATOR = generator.Generator()
 ETHERSCAN_API = None
+PATH_TREE = None
+CURRENT_EXECUTION_PATH = []
 
 """
 SIMULATION ATOMS
@@ -838,17 +840,31 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             first_arg = SYM_STACK.pop()
         else:
             raise ValueError('STACK underflow')
-    elif (opcode == 'MLOAD'):           # DONE TODO IM HERE
+    elif (opcode == 'MLOAD'):           # DONE
         if (len(SYM_STACK) > 0):
             first_arg = SYM_STACK.pop()
+            new_var_name = GENERATOR.gen_mem_var(first_arg, 32)
             if(is_all_real(first_arg)):
-                k = ""
-                for i in range(0, 32):
-                    k = k + SYM_MEMORY[first_arg + i]
-                result = int(k,16)
-                SYM_STACK.append(result)
+                if(new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                    result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+                    SYM_STACK.append(result)
+                elif(len(SYM_MEMORY) < first_arg + 32):
+                    result = BitVec(new_var_name, 256)
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
+                    SYM_STACK.append(result)
+                else:
+                    k = ""
+                    for i in range(0, 32):
+                        k = k + SYM_MEMORY[first_arg + i]
+                    result = int(k,16)
+                    SYM_STACK.append(result)
             else:
-                result = BitVec(GENERATOR.gen_mem_var(first_arg), 256)
+                result = 0
+                if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                    result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+                else:
+                    result = BitVec(new_var_name, 256)
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
                 SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
@@ -856,7 +872,10 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         if (len(SYM_STACK) > 1):
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
+            new_var_name = GENERATOR.gen_mem_var(first_arg, 32)
             if(is_all_real(first_arg, second_arg)):
+                if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                    del SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
                 second_arg = str(hex(second_arg))[2:]
                 len_arg = len(second_arg)
                 if(len_arg < 64):
@@ -864,31 +883,45 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                     second_arg = "0"*dif + second_arg
 
                 for i in range(0, 32):
-                    MEMORY[first_arg + i] = second_arg[2*i:2*i + 2]
+                    SYM_MEMORY[first_arg + i] = second_arg[2*i:2*i + 2]
             else:
-                dont_know = 1
-                # Dont know what to do
+                if (is_all_real(second_arg)):
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = BitVecVal(second_arg, 256)
+                else:
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = second_arg
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'MSTORE8'):         # DONE
         if (len(SYM_STACK) > 0):
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
+            second_arg = second_arg & 255
+            new_var_name = GENERATOR.gen_mem_var(first_arg, 32)
             if(is_all_real(first_arg, second_arg)):
-                MEMORY[first_arg] = str(hex(second_arg & 0xFF))[2:]
+                if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                    del SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+                SYM_MEMORY[first_arg] = str(hex(second_arg & 0xFF))[2:]
             else:
-                dont_know = 1
-                # Dont know what to do
+                if (is_all_real(second_arg)):
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = BitVecVal(second_arg, 256)
+                else:
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = second_arg
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'SLOAD'):           # DONE
         if (len(SYM_STACK) > 0):
             first_arg = SYM_STACK.pop()
             if(is_all_real(first_arg)):
-                result = STORAGE[first_arg]
+                result = SYM_STORAGE[first_arg]
                 SYM_STACK.append(result)
             else:
-                result = BitVec(GENERATOR.gen_owner_store_var(first_arg), 256)
+                new_var_name = GENERATOR.gen_owner_store_var(first_arg)
+                result = 0
+                if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                    result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+                else:
+                    result = BitVec(new_var_name, 256)
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
                 SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
@@ -896,10 +929,14 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         if (len(SYM_STACK) > 1):
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
-            if (is_all_real(first_arg)):
-                STORAGE[first_arg] = second_arg
+            if (is_all_real(first_arg, second_arg)):
+                SYM_STORAGE[first_arg] = second_arg
             else:
-                STORAGE[str(first_arg)] = second_arg
+                if (is_all_real(second_arg)):
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = BitVecVal(second_arg, 256)
+                else:
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = second_arg
+                STORAGE[first_arg] = second_arg
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'JUMP'):            # DONE
@@ -910,7 +947,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'JUMPI'):           # DONE          True --> '1' , False --> '0'
-        if (len(SYM_STACK) > 1):
+        if (len(SYM_STACK) > 1):            ##TODO LATER
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
             if(not(is_all_real(first_arg, second_arg))):
@@ -922,10 +959,12 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         result = GLOBAL_STATE["pc"]
         SYM_STACK.append(result)
     elif (opcode == 'MSIZE'):           # DONE BUT NOT SURE --> NOT COMPLETE and len cannot be true one!!!
-        result = len(MEMORY)
+        result = len(MEMORY) + 32*len(SYM_PATH_CONDITIONS_AND_VARS)
         SYM_STACK.append(result)
     elif (opcode == 'GAS'):             # DONE
-        result = BitVec(GENERATOR.gen_gas_var(), 256)
+        new_var_name = GENERATOR.gen_gas_var()
+        result = BitVec(new_var_name, 256)
+        SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
         SYM_STACK.append(result)
     elif (opcode == 'JUMPDEST'):        # DONE
         dont_do_anything = 1
@@ -967,7 +1006,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
-    elif (opcode == 'CALL'):        # DONE
+    elif (opcode == 'CALL'):        # DONE    TODO Money depends on time ?
         if (len(SYM_STACK) > 6):
             outgas = SYM_STACK.pop()
             recipient = SYM_STACK.pop()
@@ -978,12 +1017,15 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             size_data_ouput = SYM_STACK.pop()
 
             if(is_all_real(transfer_amount)):
-                balance = int(CONTRACT_PROPERTIES["Ia"]["balance"],16)
+                if(transfer_amount == 0):
+                    SYM_STACK.append(1)
+                    return
+                balance = int(SYM_CONTRACT_PROPERTIES["Ia"]["balance"],16)
                 is_enough_fund = (transfer_amount <= balance)
 
                 if(is_enough_fund):
-                    CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
-                    CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(CONTRACT_PROPERTIES["Is"]["balance"],16) + transfer_amount))
+                    SYM_CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
+                    SYM_CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(SYM_CONTRACT_PROPERTIES["Is"]["balance"],16) + transfer_amount))
                     SYM_STACK.append(1)
                 else:
                     SYM_STACK.append(0)
@@ -991,7 +1033,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 SYM_STACK.append(1)     ## Guessing possibly okay
         else:
             raise ValueError('STACK underflow')
-    elif (opcode == 'CALLCODE'):    # DONE
+    elif (opcode == 'CALLCODE'):    # DONE  TODO money depends on time ?
         if (len(SYM_STACK) > 6):
             outgas = SYM_STACK.pop()
             recipient = SYM_STACK.pop()
@@ -1002,12 +1044,16 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             size_data_ouput = SYM_STACK.pop()
 
             if (is_all_real(transfer_amount)):
-                balance = int(CONTRACT_PROPERTIES["Ia"]["balance"], 16)
+                if (transfer_amount == 0):
+                    SYM_STACK.append(1)
+                    return
+
+                balance = int(SYM_CONTRACT_PROPERTIES["Ia"]["balance"], 16)
                 is_enough_fund = (transfer_amount <= balance)
 
                 if (is_enough_fund):
-                    CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
-                    CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(CONTRACT_PROPERTIES["Is"]["balance"], 16) + transfer_amount))
+                    SYM_CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
+                    SYM_CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(SYM_CONTRACT_PROPERTIES["Is"]["balance"], 16) + transfer_amount))
                     SYM_STACK.append(1)
                 else:
                     SYM_STACK.append(0)

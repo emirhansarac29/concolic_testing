@@ -234,9 +234,9 @@ def main():
     simulation.SYM_STACK.append(2)
     simulation.SYM_STACK.append(3)
     simulation.SYM_STACK.append(z)
-    simulation.SYM_STACK.append(y)
+    simulation.SYM_STACK.append(33)
     simulation.SYM_STACK.append(x)
-    simulation.symbolic_execute_opcode("BALANCE", FILE_OPCODES, FILE_PC_OPCODES)
+    simulation.symbolic_execute_opcode("MSTORE8", FILE_OPCODES, FILE_PC_OPCODES)
     #simulation.symbolic_execute_opcode("SDIV", FILE_OPCODES, FILE_PC_OPCODES)
 
     print("SYM_STACK ---> " + str(simulation.SYM_STACK))
@@ -253,7 +253,9 @@ def main():
     a2 = z3.BitVec('y', 256)
     a3 = z3.BitVec('z', 256)
     a4 = z3.BitVec('t', 256)
+    print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
 
+"""
     t = simulation.SYM_STACK.pop()
     ss = Solver()
     ss.add(t == 1)
@@ -276,7 +278,7 @@ def main():
     #print("Z --> " + str(zzz))
     #print("Z --> " + str(s_zzz))
     #print((xxx*yyy)%zzz)
-
+"""
 
 if __name__ == '__main__':
     main()
