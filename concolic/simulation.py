@@ -20,6 +20,11 @@ GLOBAL_STATE= {
     "pc": 0                 # int
 }
 
+SYM_GLOBAL_STATE= {
+    "currentGas": 1000,     # int, GAS
+    "pc": 0                 # int
+}
+
 STACK = []              # all int in str format
 MEMORY = helper.GrowingList()             # Each element is 8 bit(1 byte) , 2 hex value  (LIKE ab not like 0xab)
 STORAGE = {}            # str(int) --> str(int)
@@ -29,10 +34,11 @@ SYMBOLIC SIMULATION ATOMS
 """
 SYM_STACK = []          # all kept unsigned
 SYM_MEMORY = helper.GrowingList()
+SYM_PATH_CONDITIONS_AND_VARS = {}   #IH_BLOCKHASH
 SYM_STORAGE = {}
 Symbolic_Solver = Solver()
 """
-USEFUL STUFFS
+USEFUL VALUES
 """
 UNSIGNED_BOUND_NUMBER = 2**256 - 1
 
@@ -50,6 +56,37 @@ CONTRACT_PROPERTIES = {
     "currentGasLimit": "0x0f4240",                                          #GASLIMIT
     "currentNumber": "0x00",                                                #NUMBER
     "currentTimestamp": "0x00"                                              #TIMESTAMP
+  },
+  "exec": {
+    "data": "0xff",
+    "calldata": "0xfbac12f386434657432ababbaccccccdddff1231256787ac12f386434657432ababbaccccccdddfac12f386434657432ababbaccccccdddf",    #CALLDATALOAD-CALLDATASIZE-CALLDATACOPY, input data
+    "gas": "0x0186a0",
+    "gasPrice": "0x5af3107a4000",                               #GASPRICE
+    "origin": "0xcd1722f3947def4cf144679da39c4c32bdc35681",     #origin address, sender of original transaction.
+    "value": "0x0de0b6b3a7640000"                               #CALLVALUE, deposited value by the instruction/transaction
+  },
+  "gas": "0x013874",
+  "Is": {
+  	"address": "0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6",    #CALLER, directly responsible for this execution.
+    "balance": "0xbb"                                           #CALL, their balance
+  },
+  "Ia": {
+  	"address": "0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6",    #ORIGIN, currently executing account.
+    "balance": "0xcc",                                          #CALL, my balance
+    "storage": {
+      "0x00": "0x2222"
+    }
+  },
+  "IH_BLOCKHASH": "0x0012"                                      #BLOCKHASH
+}
+
+SYM_CONTRACT_PROPERTIES = {
+  "env": {
+    "currentCoinbase": "0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba",        #COINBASE
+    "currentDifficulty": "0x0100",                                          #DIFFICULTY
+    "currentGasLimit": "0x0f4240",                                          #GASLIMIT
+    "currentNumber": "0x00",                                                #NUMBER
+    "currentTimestamp": "0x00"                                             #TIMESTAMP
   },
   "exec": {
     "data": "0xff",
@@ -312,8 +349,8 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 result = (first_arg ** second_arg) & UNSIGNED_BOUND_NUMBER
                 SYM_STACK.append(result)
             else:
-                first_arg = to_symbolic(first_arg)
-                second_arg = to_symbolic(second_arg)
+                #first_arg = to_symbolic(first_arg)
+                #second_arg = to_symbolic(second_arg)
                 result = BitVec(GENERATOR.gen_arbitrary_var(), 256)
                 SYM_STACK.append(result)
         else:
@@ -564,65 +601,91 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
             if (is_all_real(first_arg, second_arg)):
-                data = read_from_mem_sym(first_arg, second_arg)
-                hashed = Web3.sha3(data)
-                hashed_hex = Web3.toHex(hashed)
-                result = int(hashed_hex,16)
-                #result = int(hashed_hex)
-                SYM_STACK.append(result)
+                if(len(SYM_MEMORY) < first_arg + second_arg):
+                    new_var_name = GENERATOR.gen_arbitrary_var()
+                    result = BitVec(new_var_name, 256)
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
+                    SYM_STACK.append(result)
+                else:
+                    data = read_from_mem_sym(first_arg, second_arg)     ## TODO COME BACK LATER
+                    hashed = Web3.sha3(data)
+                    hashed_hex = Web3.toHex(hashed)
+                    result = int(hashed_hex,16)
+                    #result = int(hashed_hex)
+                    SYM_STACK.append(result)
             else:
-                result = BitVec(GENERATOR.gen_arbitrary_var(), 256)
+                new_var_name = GENERATOR.gen_arbitrary_var()
+                result = BitVec(new_var_name, 256)
+                SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
                 SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'ADDRESS'):     # DONE
-        result = CONTRACT_PROPERTIES['Ia']['address']
+        result = SYM_CONTRACT_PROPERTIES['Ia']['address']
         result = int(result,16)
         SYM_STACK.append(result)
     elif (opcode == 'BALANCE'):     # DONE
         if len(SYM_STACK) > 0:
-            first_arg = hex(SYM_STACK.pop())
+            first_arg = SYM_STACK.pop()
             if (is_all_real(first_arg)):
-                result = ETHERSCAN_API.getBalance(str(first_arg))   ## returns str
+                result = ETHERSCAN_API.getBalance(str(hex(first_arg)))   ## returns str
                 SYM_STACK.append(int(result))
             else:
-                result = BitVec(GENERATOR.gen_balance_var(), 256)
+                new_var_name = GENERATOR.gen_balance_var(first_arg)
+                result = 0
+                if(new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                    result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+                else:
+                    result = BitVec(new_var_name, 256)
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
                 SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'ORIGIN'):      # DONE
-        result = CONTRACT_PROPERTIES['exec']['origin']
+        result = SYM_CONTRACT_PROPERTIES['exec']['origin']
         result = int(result,16)
         SYM_STACK.append(result)
     elif (opcode == 'CALLER'):      # DONE
-        result = CONTRACT_PROPERTIES["Is"]["address"]
+        result = SYM_CONTRACT_PROPERTIES["Is"]["address"]
         result = int(result, 16)
         SYM_STACK.append(result)
     elif (opcode == 'CALLVALUE'):   # DONE
-        result = CONTRACT_PROPERTIES['exec']['value']
+        result = SYM_CONTRACT_PROPERTIES['exec']['value']
         result = int(result, 16)
         SYM_STACK.append(result)
     elif (opcode == 'CALLDATALOAD'):    # DONE
         if (len(SYM_STACK) > 0):
             first_arg = SYM_STACK.pop()
-            data = CONTRACT_PROPERTIES['exec']['calldata']
+            data = SYM_CONTRACT_PROPERTIES['exec']['calldata']
             if(is_all_real(first_arg)):
                 result = data[(2+2*first_arg):(66+2*first_arg)]
                 result = int(result,16)
-                STACK.append(result)
+                SYM_STACK.append(result)
             else:
-                result = BitVec(GENERATOR.gen_data_var(), 256)
+                new_var_name = GENERATOR.gen_data_var(first_arg)
+                result = 0
+                if(new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                    result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+                else:
+                    result = BitVec(new_var_name, 256)
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
                 SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'CALLDATASIZE'):    # DONE
-        result = BitVec(GENERATOR.gen_data_size(), 256)
+        new_var_name = GENERATOR.gen_data_size()
+        result = 0
+        if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+            result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+        else:
+            result = BitVec(new_var_name, 256)
+            SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
         SYM_STACK.append(result)
     elif (opcode == 'CALLDATACOPY'):    # DONE
         if (len(SYM_STACK) > 2):
-            first_arg = STACK.pop()
-            second_arg = STACK.pop()
-            third_arg = STACK.pop()
+            first_arg = SYM_STACK.pop()
+            second_arg = SYM_STACK.pop()
+            third_arg = SYM_STACK.pop()
             # NO WAY OF SIMULATION
         else:
             raise ValueError('STACK underflow')
@@ -648,14 +711,19 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 bin_file = bin_file[index + 7:][:-1]
 
                 for count in range(0, third_arg):
-                    MEMORY[first_arg + count] = str(bin_file[2*(second_arg + count)]) + str(bin_file[2*(second_arg + count) + 1])
+                    SYM_MEMORY[first_arg + count] = str(bin_file[2*(second_arg + count)]) + str(bin_file[2*(second_arg + count) + 1])
             else:
-                dont_know = 1
-                # Dont know what to do
+                new_var_name = GENERATOR.gen_mem_var(first_arg, third_arg)
+                result = 0
+                if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                    result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+                else:
+                    result = BitVec(new_var_name, 256)
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'GASPRICE'):        # DONE
-        result = CONTRACT_PROPERTIES['exec']['gasPrice']
+        result = SYM_CONTRACT_PROPERTIES['exec']['gasPrice']
         result = int(result, 16)
         SYM_STACK.append(result)
     elif (opcode == 'EXTCODESIZE'):     # DONE
@@ -666,7 +734,13 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 result = int(len(ETHERSCAN_API.getCode(str(first_arg))) - 2)/2
                 SYM_STACK.append(result)
             else:
-                result = BitVec(GENERATOR.gen_code_size_var(first_arg), 256)    ## TODO suspicious about this
+                new_var_name = GENERATOR.gen_code_size_var(first_arg)
+                result = 0
+                if(new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                    result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+                else:
+                    result = BitVec(new_var_name, 256)
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
                 SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
@@ -679,52 +753,98 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             if(is_all_real(first_arg, second_arg, third_arg, fourth_arg)):
                 code = ETHERSCAN_API.getCode(str(hex(first_arg)))[2:]
                 for count in range(0, fourth_arg):
-                    MEMORY[second_arg + count] = str(code[2*(third_arg + count)]) + str(code[2*(third_arg + count) + 1])
+                    SYM_MEMORY[second_arg + count] = str(code[2*(third_arg + count)]) + str(code[2*(third_arg + count) + 1])
             else:
-                dont_know = 1
-                # Dont know what to do
+                new_var_name = GENERATOR.gen_mem_var(second_arg, fourth_arg)
+                result = 0
+                if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                    result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+                else:
+                    result = BitVec(new_var_name, 256)
+                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'BLOCKHASH'):       # NOT COMPLETE YET
         if (len(SYM_STACK) > 0):
             SYM_STACK.pop()
-            result = CONTRACT_PROPERTIES["IH_BLOCKHASH"]
-            result = int(result, 16)
+            #CONTRACT_PROPERTIES["IH_BLOCKHASH"] ... int(result, 16)
+            new_var_name = "IH_BLOCKHASH"
+            result = 0
+            if(new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+                result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+            else:
+                result = BitVec(new_var_name, 256)
+                SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
             SYM_STACK.append(result)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'COINBASE'):        # DONE
-        result = CONTRACT_PROPERTIES['env']['currentCoinbase']
-        result = int(result, 16)
+        #result = CONTRACT_PROPERTIES['env']['currentCoinbase']
+        #result = int(result, 16)
+        new_var_name = "IH_COINBASE"
+        result = 0
+        if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+            result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+        else:
+            result = BitVec(new_var_name, 256)
+            SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
         SYM_STACK.append(result)
     elif (opcode == 'TIMESTAMP'):       # DONE
-        result = CONTRACT_PROPERTIES['env']['currentTimestamp']
-        result = int(result, 16)
+        #result = CONTRACT_PROPERTIES['env']['currentTimestamp']
+        #result = int(result, 16)
+        new_var_name = "IH_TIMESTAMP"
+        result = 0
+        if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+            result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+        else:
+            result = BitVec(new_var_name, 256)
+            SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
         SYM_STACK.append(result)
     elif (opcode == 'NUMBER'):          # DONE
-        result = CONTRACT_PROPERTIES['env']['currentNumber']
-        result = int(result, 16)
+        #result = CONTRACT_PROPERTIES['env']['currentNumber']
+        #result = int(result, 16)
+        new_var_name = "IH_NUMBER"
+        result = 0
+        if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+            result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+        else:
+            result = BitVec(new_var_name, 256)
+            SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
         SYM_STACK.append(result)
     elif (opcode == 'DIFFICULTY'):      # DONE
-        result = CONTRACT_PROPERTIES['env']['currentDifficulty']
-        result = int(result, 16)
+        #result = CONTRACT_PROPERTIES['env']['currentDifficulty']
+        #result = int(result, 16)
+        new_var_name = "IH_DIFFICULTY"
+        result = 0
+        if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+            result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+        else:
+            result = BitVec(new_var_name, 256)
+            SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
         SYM_STACK.append(result)
     elif (opcode == 'GASLIMIT'):        # DONE
-        result = CONTRACT_PROPERTIES['env']['currentGasLimit']
-        result = int(result, 16)
+        #result = CONTRACT_PROPERTIES['env']['currentGasLimit']
+        #result = int(result, 16)
+        new_var_name = "IH_GASLIMIT"
+        result = 0
+        if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+            result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+        else:
+            result = BitVec(new_var_name, 256)
+            SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
         SYM_STACK.append(result)
     elif (opcode == 'POP'):             # DONE
         if (len(SYM_STACK) > 0):
             first_arg = SYM_STACK.pop()
         else:
             raise ValueError('STACK underflow')
-    elif (opcode == 'MLOAD'):           # DONE
+    elif (opcode == 'MLOAD'):           # DONE TODO IM HERE
         if (len(SYM_STACK) > 0):
-            first_arg = STACK.pop()
+            first_arg = SYM_STACK.pop()
             if(is_all_real(first_arg)):
                 k = ""
                 for i in range(0, 32):
-                    k = k + MEMORY[first_arg + i]
+                    k = k + SYM_MEMORY[first_arg + i]
                 result = int(k,16)
                 SYM_STACK.append(result)
             else:

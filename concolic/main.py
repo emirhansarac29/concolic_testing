@@ -236,7 +236,7 @@ def main():
     simulation.SYM_STACK.append(z)
     simulation.SYM_STACK.append(y)
     simulation.SYM_STACK.append(x)
-    simulation.symbolic_execute_opcode("LOG1", FILE_OPCODES, FILE_PC_OPCODES)
+    simulation.symbolic_execute_opcode("BALANCE", FILE_OPCODES, FILE_PC_OPCODES)
     #simulation.symbolic_execute_opcode("SDIV", FILE_OPCODES, FILE_PC_OPCODES)
 
     print("SYM_STACK ---> " + str(simulation.SYM_STACK))
@@ -256,7 +256,7 @@ def main():
 
     t = simulation.SYM_STACK.pop()
     ss = Solver()
-    ss.add(t == 4)
+    ss.add(t == 1)
     print(ss.check())
     model = ss.model()
     print(model)

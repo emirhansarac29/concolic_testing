@@ -13,14 +13,16 @@ class Generator:
         return "Id_" + str(self.countdata)
 
     def gen_data_var(self, position):
-        self.countdata += 1
-        return "Id_" + str(self.countdata)
+        return "Id_" + str(position)
 
     def gen_data_size(self):
         return "Id_size"
 
     def gen_mem_var(self, address):
         return "mem_" + str(address)
+
+    def gen_mem_var(self, begin, bytecount):
+        return "mem_" + str(begin) + "_" + str(bytecount)
 
     def gen_arbitrary_var(self):
         self.count += 1
@@ -52,6 +54,9 @@ class Generator:
     def gen_balance_var(self):
         self.count += 1
         return "balance_" + str(self.count)
+
+    def gen_balance_var(self, address):
+        return "balance_" + str(address)
 
     def gen_code_var(self, address, position, bytecount):
         return "code_" + str(address) + "_" + str(position) + "_" + str(bytecount)
