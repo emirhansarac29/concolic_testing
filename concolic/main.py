@@ -6,6 +6,7 @@ import sys
 import re
 import six
 from z3 import *
+import generator
 
 import opcodes
 import basicblock
@@ -152,7 +153,9 @@ def main():
     for a in range(len(FILE_PC_OPCODES)):
         FILE_PC_OPCODES[a] = int(FILE_PC_OPCODES[a])
 
+    FILE_PC_TO_INDEX = {}
     for a in range(len(FILE_OPCODES)):
+        FILE_PC_TO_INDEX[FILE_PC_OPCODES[a]] = a
         print("[" + str(FILE_PC_OPCODES[a]) + "]" + " " + FILE_OPCODES[a].name + "  " + str(FILE_OPCODES[a].par))
 
     #print(len(FILE_PC_OPCODES))
@@ -167,12 +170,30 @@ def main():
         print(str(a.begin) + " <-> " + str(a.signature))
 
     FUNCTION_PARAMETERS = find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES)
-    #print(FUNCTION_PARAMETERS)
+    print(FUNCTION_PARAMETERS)
     #print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
 
     simulation.init_etherscan()
 
+    # Only static parameters will be used, not string and bytes
+    for function in FUNCTIONS:
+        f_id = function.signature
+        f_begin_pc = function.begin
+        f_begin_index = FILE_PC_TO_INDEX[f_begin_pc]
 
+        simulation.CONTRACT_PROPERTIES['exec']['calldata'] = (str(hex(f_id))) +  ((64*(len(FUNCTION_PARAMETERS[f_id]))) * "1")
+        simulation.GLOBAL_STATE["pc"] = 0
+        while(True):
+            if (FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name == "RETURN"):
+                break
+            simulation.execute_opcode(FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name, FILE_OPCODES, FILE_PC_OPCODES)
+
+    print("STACK ---> " + str(simulation.STACK))
+    print("MEMORY ---> " + str(simulation.MEMORY))
+    print("STORAGE ---> " + str(simulation.STORAGE))
+    print(simulation.GLOBAL_STATE)
+
+"""
     simulation.MEMORY[0] = "2a"
     simulation.MEMORY[1] = "33"
     simulation.MEMORY[2] = "00"
@@ -228,14 +249,15 @@ def main():
     print(simulation.GLOBAL_STATE["pc"])
     x = z3.BitVec('x', 256)
     y = z3.BitVec('y', 256)
+    z = z3.BitVec('z', 256)
     simulation.SYM_STACK.append(x - 5)
     simulation.SYM_STACK.append(2)
     simulation.SYM_STACK.append(3)
-    simulation.SYM_STACK.append(x+y)
-    simulation.SYM_STACK.append(x - 5)
-    simulation.SYM_STACK.append(y)
-    simulation.symbolic_execute_opcode("SDIV", FILE_OPCODES, FILE_PC_OPCODES)
-    simulation.symbolic_execute_opcode("SDIV", FILE_OPCODES, FILE_PC_OPCODES)
+    simulation.SYM_STACK.append(z)
+    simulation.SYM_STACK.append(33)
+    simulation.SYM_STACK.append(x)
+    simulation.symbolic_execute_opcode("MSTORE8", FILE_OPCODES, FILE_PC_OPCODES)
+    #simulation.symbolic_execute_opcode("SDIV", FILE_OPCODES, FILE_PC_OPCODES)
 
     print("SYM_STACK ---> " + str(simulation.SYM_STACK))
     #simulation.STACK.append(str(int("0x4ff2588fF42954bB45127aD4805099796756aCf5",16)))
@@ -251,16 +273,31 @@ def main():
     a2 = z3.BitVec('y', 256)
     a3 = z3.BitVec('z', 256)
     a4 = z3.BitVec('t', 256)
+    print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
 
     t = simulation.SYM_STACK.pop()
     ss = Solver()
-    #ss.add(t == 10)
-    #ss.check()
-    #print(ss.model())
+    ss.add(t == 1)
+    print(ss.check())
+    model = ss.model()
+    print(model)
 
-
-
-
+    print(2**255)
+    print(2**256)
+    xxx = int(str(model[x]))
+    s_xxx = simulation.to_signed(xxx)
+    yyy = int(str(model[y]))
+    s_yyy = simulation.to_signed(yyy)
+    #zzz = int(str(model[z]))
+    #s_zzz = simulation.to_signed(zzz)
+    print("X --> " + str(xxx))
+    print("X --> " + str(s_xxx))
+    print("Y --> " + str(yyy))
+    print("Y --> " + str(s_yyy))
+    #print("Z --> " + str(zzz))
+    #print("Z --> " + str(s_zzz))
+    #print((xxx*yyy)%zzz)
+"""
 
 if __name__ == '__main__':
     main()
