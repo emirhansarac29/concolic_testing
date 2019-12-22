@@ -22,11 +22,6 @@ GLOBAL_STATE= {
     "pc": 0                 # int
 }
 
-SYM_GLOBAL_STATE= {
-    "currentGas": 1000,     # int, GAS
-    "pc": 0                 # int
-}
-
 STACK = []              # all int in str format
 MEMORY = helper.GrowingList()             # Each element is 8 bit(1 byte) , 2 hex value  (LIKE ab not like 0xab)
 STORAGE = {}            # str(int) --> str(int)
@@ -34,9 +29,10 @@ STORAGE = {}            # str(int) --> str(int)
 """
 SYMBOLIC SIMULATION ATOMS
 """
+SYM_FIRST_CALLDATALOAD = True
 SYM_STACK = []          # all kept unsigned
 SYM_MEMORY = helper.GrowingList()
-SYM_PATH_CONDITIONS_AND_VARS = {}   #IH_BLOCKHASH
+SYM_PATH_CONDITIONS_AND_VARS = {"path_condition" : []}   #IH_BLOCKHASH
 SYM_STORAGE = {}
 Symbolic_Solver = Solver()
 """
@@ -75,37 +71,6 @@ CONTRACT_PROPERTIES = {
   "Ia": {
   	"address": "0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6",    #ORIGIN, currently executing account.
     "balance": "0xcc",                                          #CALL, my balance
-    "storage": {
-      "0x00": "0x2222"
-    }
-  },
-  "IH_BLOCKHASH": "0x0012"                                      #BLOCKHASH
-}
-
-SYM_CONTRACT_PROPERTIES = {
-  "env": {
-    "currentCoinbase": "0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba",        #COINBASE
-    "currentDifficulty": "0x0100",                                          #DIFFICULTY
-    "currentGasLimit": "0x0f4240",                                          #GASLIMIT
-    "currentNumber": "0x00",                                                #NUMBER
-    "currentTimestamp": "0x00"                                             #TIMESTAMP
-  },
-  "exec": {
-    "data": "0xff",
-    "calldata": "0xfbac12f386434657432ababbaccccccdddff1231256787ac12f386434657432ababbaccccccdddfac12f386434657432ababbaccccccdddf",    #CALLDATALOAD-CALLDATASIZE-CALLDATACOPY, input data
-    "gas": "0x0186a0",
-    "gasPrice": "0x5af3107a4000",                               #GASPRICE
-    "origin": "0xcd1722f3947def4cf144679da39c4c32bdc35681",     #origin address, sender of original transaction.
-    "value": "0x0"                               #CALLVALUE, deposited value by the instruction/transaction
-  },
-  "gas": "0x013874",
-  "Is": {
-  	"address": "0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6",    #CALLER, directly responsible for this execution.
-    "balance": 100000                                           #CALL, their balance
-  },
-  "Ia": {
-  	"address": "0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6",    #ORIGIN, currently executing account.
-    "balance": 100000,                                          #CALL, my balance
     "storage": {
       "0x00": "0x2222"
     }
@@ -656,24 +621,15 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         result = int(result, 16)
         SYM_STACK.append(result)
     elif (opcode == 'CALLDATALOAD'):    # DONE
-        if (len(SYM_STACK) > 0):
-            """
+        global SYM_FIRST_CALLDATALOAD
+        if(len(SYM_STACK) > 0 and SYM_FIRST_CALLDATALOAD):
             first_arg = SYM_STACK.pop()
-            data = SYM_CONTRACT_PROPERTIES['exec']['calldata']
-            if(is_all_real(first_arg)):
-                result = data[(2+2*first_arg):(66+2*first_arg)]
-                result = int(result,16)
-                SYM_STACK.append(result)
-            else:
-                new_var_name = GENERATOR.gen_data_var(first_arg)
-                result = 0
-                if(new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
-                    result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
-                else:
-                    result = BitVec(new_var_name, 256)
-                    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
-                SYM_STACK.append(result)
-            """
+            data = CONTRACT_PROPERTIES['exec']['calldata']
+            result = data[(2 + 2 * first_arg):(66 + 2 * first_arg)]
+            result = int(result, 16)
+            SYM_STACK.append(result)
+            SYM_FIRST_CALLDATALOAD = False
+        elif (len(SYM_STACK) > 0):
             new_var_name = GENERATOR.gen_par_var()
             result = 0
             if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
@@ -686,13 +642,16 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             raise ValueError('STACK underflow')
     elif (opcode == 'CALLDATASIZE'):    # DONE
         new_var_name = GENERATOR.gen_data_size()
-        result = 0
-        if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
-            result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
-        else:
-            result = BitVec(new_var_name, 256)
-            SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
+        data = CONTRACT_PROPERTIES['exec']['calldata']
+        result = int((len(data) - 2) / 2)
         SYM_STACK.append(result)
+        #result = 0
+        #if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
+        #    result = SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
+        #else:
+        #    result = BitVec(new_var_name, 256)
+        #    SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = result
+        #SYM_STACK.append(result)
     elif (opcode == 'CALLDATACOPY'):    # DONE
         if (len(SYM_STACK) > 2):
             first_arg = SYM_STACK.pop()
@@ -906,7 +865,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
             second_arg = second_arg & 255
-            new_var_name = GENERATOR.gen_mem_var(first_arg, 32)
+            new_var_name = GENERATOR.gen_mem_var(first_arg, 8)
             if(is_all_real(first_arg, second_arg)):
                 if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
                     del SYM_PATH_CONDITIONS_AND_VARS[new_var_name]
@@ -939,6 +898,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         if (len(SYM_STACK) > 1):
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
+            new_var_name = GENERATOR.gen_owner_store_var(first_arg)
             if (is_all_real(first_arg, second_arg)):
                 SYM_STORAGE[first_arg] = second_arg
             else:
@@ -946,7 +906,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                     SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = BitVecVal(second_arg, 256)
                 else:
                     SYM_PATH_CONDITIONS_AND_VARS[new_var_name] = second_arg
-                STORAGE[first_arg] = second_arg
+
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'JUMP'):            # DONE
@@ -960,6 +920,10 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         if (len(SYM_STACK) > 1):            ##TODO LATER
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
+            if(is_all_real(first_arg, second_arg)):
+                do_not = 1
+            else:
+                do_not = 1
             #if(not(is_all_real(first_arg, second_arg))):
             #    will_do= 1
                ## TODO TREE CONSTRUCTION
@@ -1026,21 +990,31 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             start_data_output = SYM_STACK.pop()
             size_data_ouput = SYM_STACK.pop()
 
-            if(is_all_real(transfer_amount, )):
-                if(transfer_amount == 0):
-                    SYM_STACK.append(1)
-                    return
+            if(transfer_amount == 0):
+                SYM_STACK.append(1)
+                return
+            my_balance = "my_balance"
+            if(my_balance in SYM_PATH_CONDITIONS_AND_VARS):
+                SYM_PATH_CONDITIONS_AND_VARS[my_balance] = SYM_PATH_CONDITIONS_AND_VARS[my_balance] - transfer_amount
             else:
-                balance = SYM_CONTRACT_PROPERTIES["Ia"]["balance"]
-                is_enough_fund = transfer_amount <= balance
+                new_my_balance = BitVec(my_balance, 256)
+                SYM_PATH_CONDITIONS_AND_VARS[my_balance] = new_my_balance - transfer_amount
+            SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(SYM_PATH_CONDITIONS_AND_VARS[my_balance] >= 0)
 
-                if (is_enough_fund):
-                    SYM_CONTRACT_PROPERTIES["Ia"]["balance"] = balance - transfer_amount
-                    SYM_CONTRACT_PROPERTIES["Is"]["balance"] = SYM_CONTRACT_PROPERTIES["Is"][
-                                                                   "balance"] + transfer_amount
-                    SYM_STACK.append(1)
-                else:
-                    SYM_STACK.append(0)
+            other_balance = str(recipient) + "_balance"
+            if (other_balance in SYM_PATH_CONDITIONS_AND_VARS):
+                SYM_PATH_CONDITIONS_AND_VARS[other_balance] = SYM_PATH_CONDITIONS_AND_VARS[other_balance] + transfer_amount
+            else:
+                new_other_balance = BitVec(other_balance, 256)
+                SYM_PATH_CONDITIONS_AND_VARS[other_balance] = new_other_balance + transfer_amount
+            SYM_STACK.append(1)
+
+                #if (is_enough_fund):
+                #   SYM_CONTRACT_PROPERTIES["Ia"]["balance"] = balance - transfer_amount
+                #   SYM_CONTRACT_PROPERTIES["Is"]["balance"] = SYM_CONTRACT_PROPERTIES["Is"]["balance"] + transfer_amount
+                #   SYM_STACK.append(1)
+                #else:
+                #    SYM_STACK.append(0)    We assume all operations have enough fund
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'CALLCODE'):    # DONE  TODO money depends on time ?
@@ -1053,22 +1027,25 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             start_data_output = SYM_STACK.pop()
             size_data_ouput = SYM_STACK.pop()
 
-            if (is_all_real(transfer_amount)):
-                if (transfer_amount == 0):
-                    SYM_STACK.append(1)
-                    return
-
-                balance = int(SYM_CONTRACT_PROPERTIES["Ia"]["balance"], 16)
-                is_enough_fund = (transfer_amount <= balance)
-
-                if (is_enough_fund):
-                    SYM_CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
-                    SYM_CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(SYM_CONTRACT_PROPERTIES["Is"]["balance"], 16) + transfer_amount))
-                    SYM_STACK.append(1)
-                else:
-                    SYM_STACK.append(0)
+            if (transfer_amount == 0):
+                SYM_STACK.append(1)
+                return
+            my_balance = "my_balance"
+            if (my_balance in SYM_PATH_CONDITIONS_AND_VARS):
+                SYM_PATH_CONDITIONS_AND_VARS[my_balance] = SYM_PATH_CONDITIONS_AND_VARS[my_balance] - transfer_amount
             else:
-                SYM_STACK.append(1)  ## Guessing possibly okay
+                new_my_balance = BitVec(my_balance, 256)
+                SYM_PATH_CONDITIONS_AND_VARS[my_balance] = new_my_balance - transfer_amount
+            SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(SYM_PATH_CONDITIONS_AND_VARS[my_balance] >= 0)
+
+            other_balance = str(recipient) + "_balance"
+            if (other_balance in SYM_PATH_CONDITIONS_AND_VARS):
+                SYM_PATH_CONDITIONS_AND_VARS[other_balance] = SYM_PATH_CONDITIONS_AND_VARS[
+                                                                  other_balance] + transfer_amount
+            else:
+                new_other_balance = BitVec(other_balance, 256)
+                SYM_PATH_CONDITIONS_AND_VARS[other_balance] = new_other_balance + transfer_amount
+            SYM_STACK.append(1)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'RETURN'):  # DONE
@@ -1836,3 +1813,21 @@ def check_sat(pop_if_exception=True):
 def init_etherscan():
     global ETHERSCAN_API
     ETHERSCAN_API = EthereumData()
+
+    """ if (is_all_real(transfer_amount)):
+                    if (transfer_amount == 0):
+                        SYM_STACK.append(1)
+                        return
+
+                    balance = int(SYM_CONTRACT_PROPERTIES["Ia"]["balance"], 16)
+                    is_enough_fund = (transfer_amount <= balance)
+
+                    if (is_enough_fund):
+                        SYM_CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
+                        SYM_CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(SYM_CONTRACT_PROPERTIES["Is"]["balance"], 16) + transfer_amount))
+                        SYM_STACK.append(1)
+                    else:
+                        SYM_STACK.append(0)
+
+                else:
+                    SYM_STACK.append(1)  ## Guessing possibly okay"""

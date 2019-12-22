@@ -173,8 +173,6 @@ def main():
     print(FUNCTION_PARAMETERS)
     #print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
 
-    simulation.init_etherscan()
-
     # Only static parameters will be used, not string and bytes
     for function in FUNCTIONS:
         f_id = function.signature
@@ -183,14 +181,21 @@ def main():
 
         simulation.CONTRACT_PROPERTIES['exec']['calldata'] = (str(hex(f_id))) +  ((64*(len(FUNCTION_PARAMETERS[f_id]))) * "1")
         simulation.GLOBAL_STATE["pc"] = 0
-        while(True):
+        #while(True):
+        for a in range(22):
             if (FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name == "RETURN"):
                 break
-            simulation.execute_opcode(FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name, FILE_OPCODES, FILE_PC_OPCODES)
+            current_pc = simulation.GLOBAL_STATE["pc"]
+            simulation.symbolic_execute_opcode(FILE_OPCODES[FILE_PC_TO_INDEX[current_pc]].name, FILE_OPCODES,FILE_PC_OPCODES)
+            simulation.execute_opcode(FILE_OPCODES[FILE_PC_TO_INDEX[current_pc]].name, FILE_OPCODES, FILE_PC_OPCODES)
 
     print("STACK ---> " + str(simulation.STACK))
+    print("SYM_STACK ---> " + str(simulation.SYM_STACK))
     print("MEMORY ---> " + str(simulation.MEMORY))
+    print("SYM_MEMORY ---> " + str(simulation.SYM_MEMORY))
     print("STORAGE ---> " + str(simulation.STORAGE))
+    print("SYM_STORAGE ---> " + str(simulation.SYM_STORAGE))
+    print("SYM_PATH_CONDITIONS_AND_VARS ---> " + str(simulation.SYM_PATH_CONDITIONS_AND_VARS))
     print(simulation.GLOBAL_STATE)
 
 """
