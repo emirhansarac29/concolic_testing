@@ -29,10 +29,11 @@ STORAGE = {}            # str(int) --> str(int)
 """
 SYMBOLIC SIMULATION ATOMS
 """
+SYM_REQUEST_COND = False
 SYM_FIRST_CALLDATALOAD = True
 SYM_STACK = []          # all kept unsigned
 SYM_MEMORY = helper.GrowingList()
-SYM_PATH_CONDITIONS_AND_VARS = {"path_condition" : []}   #IH_BLOCKHASH
+SYM_PATH_CONDITIONS_AND_VARS = {"path_condition" : [], "path_condition_status" : []}   #IH_BLOCKHASH
 SYM_STORAGE = {}
 Symbolic_Solver = Solver()
 """
@@ -630,6 +631,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             SYM_STACK.append(result)
             SYM_FIRST_CALLDATALOAD = False
         elif (len(SYM_STACK) > 0):
+            first_arg = SYM_STACK.pop()
             new_var_name = GENERATOR.gen_par_var()
             result = 0
             if (new_var_name in SYM_PATH_CONDITIONS_AND_VARS):
@@ -917,13 +919,16 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'JUMPI'):           # DONE          True --> '1' , False --> '0'
+        global SYM_REQUEST_COND
         if (len(SYM_STACK) > 1):            ##TODO LATER
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
-            if(is_all_real(first_arg, second_arg)):
+            if(is_all_real(second_arg)):
                 do_not = 1
             else:
-                do_not = 1
+                SYM_REQUEST_COND = True
+                SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(second_arg)
+
             #if(not(is_all_real(first_arg, second_arg))):
             #    will_do= 1
                ## TODO TREE CONSTRUCTION
@@ -1583,13 +1588,20 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'JUMPI'):           # DONE          True --> '1' , False --> '0'
+        global SYM_REQUEST_COND
         if (len(STACK) > 1):
             first_arg = int(STACK.pop())
             second_arg = STACK.pop()
             if second_arg == "1":    # "1" will represent true and "0" will be false
                 GLOBAL_STATE["pc"] = first_arg
+                if(SYM_REQUEST_COND):
+                    SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].append(True)
+                    SYM_REQUEST_COND = False
             else:
                 GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
+                if(SYM_REQUEST_COND):
+                    SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].append(False)
+                    SYM_REQUEST_COND = False
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'PC'):              # DONE

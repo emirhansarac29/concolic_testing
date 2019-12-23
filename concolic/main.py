@@ -182,7 +182,7 @@ def main():
         simulation.CONTRACT_PROPERTIES['exec']['calldata'] = (str(hex(f_id))) +  ((64*(len(FUNCTION_PARAMETERS[f_id]))) * "1")
         simulation.GLOBAL_STATE["pc"] = 0
         #while(True):
-        for a in range(22):
+        for a in range(140):
             if (FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name == "RETURN"):
                 break
             current_pc = simulation.GLOBAL_STATE["pc"]
@@ -197,6 +197,13 @@ def main():
     print("SYM_STORAGE ---> " + str(simulation.SYM_STORAGE))
     print("SYM_PATH_CONDITIONS_AND_VARS ---> " + str(simulation.SYM_PATH_CONDITIONS_AND_VARS))
     print(simulation.GLOBAL_STATE)
+    print(len(simulation.STACK) == len(simulation.SYM_STACK))
+
+    Solver_t = Solver()
+    Solver_t.add(simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"][0] == True)
+    Solver_t.check()
+    model = Solver_t.model()
+    print(model)
 
 """
     simulation.MEMORY[0] = "2a"
