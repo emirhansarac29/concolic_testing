@@ -266,7 +266,7 @@ def main():
             #print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
             current_leaf = simulation.EXECUTION_PATH_TREE
             for cond in range(len(simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"])):
-                if(current_leaf["condition"] == None):
+                if(current_leaf == None):
                     path_way = 0
                     if(simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"][0]):
                         path_way = 1
