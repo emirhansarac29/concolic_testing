@@ -12,6 +12,8 @@ import opcodes
 import basicblock
 import simulation
 
+NEXT_TRACE = []
+
 class OPCODE:
     def __init__(self, name, par):
         self.name = name
@@ -132,12 +134,74 @@ def find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES):
 
     return parameters
 
+def reset_and_set_initials(trace, number_of_pars, hex_f_id):
+    t_trace = trace
+    root = simulation.EXECUTION_PATH_TREE
+    temp = root
+    solver_next = Solver()
+    for a in t_trace:
+        if(a == 0):
+            solver_next.add(root["condition"] == False)
+            root = root[0]
+        else:
+            solver_next.add(root["condition"] == True)
+            root = root[1]
+    if(solver_next.check() != z3.sat):
+        temp_2 = temp
+        for a in t_trace:
+            temp_2 = temp
+            temp = temp[a]
+        temp_2[t_trace[len(t_trace)-1]] = "unsat"
+        return "unsat"
+    else:
+        model = solver_next.model()
+        print(model)
+        exec_calldata = hex_f_id
+        new_datas = {}
+        for a in range(number_of_pars):
+            par = model[simulation.SYM_PATH_CONDITIONS_AND_VARS["parameter_" + str(a + 1)]]
+            if(par == None):
+                exec_calldata = exec_calldata + (64 * "1")
+            else:
+                val_hex = hex(int(str(par)))[2:]
+                h_l = 64 - len(val_hex)
+                if(h_l > 0):
+                    val_hex = ("0" * h_l) + val_hex
+                exec_calldata = exec_calldata + val_hex
+        simulation.reset_inputs()
+        simulation.CONTRACT_PROPERTIES['exec']['calldata'] = exec_calldata
+        simulation.GLOBAL_STATE["pc"] = 0
+        return "sat"
+
+
+def re_find_new_path_trace(leaf, current_trace):
+    global NEXT_TRACE
+    if(leaf["condition"] == None):
+        return
+    if(leaf[0] == None):
+        NEXT_TRACE = current_trace + [0]
+    if (leaf[1] == None):
+        NEXT_TRACE = current_trace + [1]
+    if(leaf[0] != None and leaf[0] != "unsat"):
+        re_find_new_path_trace(leaf[0], current_trace + [0])
+    if(leaf[1] != None and leaf[1] != "unsat"):
+        re_find_new_path_trace(leaf[1], current_trace + [1])
+
+
+def find_new_path_trace():
+    root = simulation.EXECUTION_PATH_TREE
+    current_trace = []
+    if(root["condition"] == None):
+        return []
+    re_find_new_path_trace(root, current_trace)
+
 """
 solc --bin-runtime asd.sol > bin.txt
 solc --optimize --opcodes asd.sol 
 """
 
 def main():
+    global NEXT_TRACE
     if (len(sys.argv) != 2):
         exit()
     solidity_file = sys.argv[1]
@@ -179,16 +243,63 @@ def main():
         f_begin_pc = function.begin
         f_begin_index = FILE_PC_TO_INDEX[f_begin_pc]
 
-        simulation.CONTRACT_PROPERTIES['exec']['calldata'] = (str(hex(f_id))) +  ((64*(len(FUNCTION_PARAMETERS[f_id]))) * "1")
+        number_of_pars = len(FUNCTION_PARAMETERS[f_id])
+        hex_f_id = hex(f_id)[2:]
+        h_l = 8 - len(hex_f_id)
+        if (h_l > 0):
+            hex_f_id = "0x" + str(("0" * h_l)) + hex_f_id
+        else:
+            hex_f_id = "0x" + hex_f_id
+        simulation.CONTRACT_PROPERTIES['exec']['calldata'] = hex_f_id + ((64*number_of_pars) * "1")
         simulation.GLOBAL_STATE["pc"] = 0
-        #while(True):
-        for a in range(140):
-            if (FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name == "RETURN"):
-                break
-            current_pc = simulation.GLOBAL_STATE["pc"]
-            simulation.symbolic_execute_opcode(FILE_OPCODES[FILE_PC_TO_INDEX[current_pc]].name, FILE_OPCODES,FILE_PC_OPCODES)
-            simulation.execute_opcode(FILE_OPCODES[FILE_PC_TO_INDEX[current_pc]].name, FILE_OPCODES, FILE_PC_OPCODES)
 
+        for kkk in range(3):
+            #print("EXECUTION PARS --> " + str(simulation.CONTRACT_PROPERTIES['exec']['calldata']))
+            while(True):
+                op_name = FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name
+                if (op_name == "RETURN" or op_name == "REVERT"):
+                    break
+                simulation.symbolic_execute_opcode(op_name, FILE_OPCODES,FILE_PC_OPCODES)
+                simulation.execute_opcode(op_name, FILE_OPCODES, FILE_PC_OPCODES)
+
+            #print("PATH --> " + str(simulation.EXECUTION_PATH_TREE))
+            #print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
+            current_leaf = simulation.EXECUTION_PATH_TREE
+            for cond in range(len(simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"])):
+                if(current_leaf["condition"] == None):
+                    path_way = 0
+                    if(simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"][0]):
+                        path_way = 1
+                    current_leaf["condition"] = simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"][0]
+                    current_leaf[path_way] = {"condition" : None, 0 : None, 1 : None}
+                    current_leaf = current_leaf[path_way]
+                    simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"].pop(0)
+                    simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].pop(0)
+                else:
+                    path_way = 0
+                    if (simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"][0]):
+                        path_way = 1
+                    current_leaf = current_leaf[path_way]
+                    simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"].pop(0)
+                    simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].pop(0)
+            print(simulation.EXECUTION_PATH_TREE)
+            #print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
+            cont_concolic = True
+            while(True):
+                find_new_path_trace()
+                trace = NEXT_TRACE
+                NEXT_TRACE = []
+                if(trace == []):
+                    cont_concolic = False
+                    break
+                found = reset_and_set_initials(trace, number_of_pars, hex_f_id)
+                if(found == "sat"):
+                    break
+            if(cont_concolic == False):
+                break
+
+
+"""
     print("STACK ---> " + str(simulation.STACK))
     print("SYM_STACK ---> " + str(simulation.SYM_STACK))
     print("MEMORY ---> " + str(simulation.MEMORY))
@@ -198,13 +309,15 @@ def main():
     print("SYM_PATH_CONDITIONS_AND_VARS ---> " + str(simulation.SYM_PATH_CONDITIONS_AND_VARS))
     print(simulation.GLOBAL_STATE)
     print(len(simulation.STACK) == len(simulation.SYM_STACK))
-
+    print(simulation.EXECUTION_PATH_TREE)
+"""
+"""
     Solver_t = Solver()
     Solver_t.add(simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"][0] == True)
     Solver_t.check()
     model = Solver_t.model()
     print(model)
-
+"""
 """
     simulation.MEMORY[0] = "2a"
     simulation.MEMORY[1] = "33"
