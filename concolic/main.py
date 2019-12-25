@@ -253,8 +253,8 @@ def main():
         simulation.CONTRACT_PROPERTIES['exec']['calldata'] = hex_f_id + ((64*number_of_pars) * "1")
         simulation.GLOBAL_STATE["pc"] = 0
 
-        for kkk in range(3):
-            #print("EXECUTION PARS --> " + str(simulation.CONTRACT_PROPERTIES['exec']['calldata']))
+        while(True):
+            print("EXECUTION PARS --> " + str(simulation.CONTRACT_PROPERTIES['exec']['calldata']))
             while(True):
                 op_name = FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name
                 if (op_name == "RETURN" or op_name == "REVERT"):
@@ -266,7 +266,7 @@ def main():
             #print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
             current_leaf = simulation.EXECUTION_PATH_TREE
             for cond in range(len(simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"])):
-                if(current_leaf == None):
+                if(current_leaf["condition"] == None):
                     path_way = 0
                     if(simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"][0]):
                         path_way = 1
@@ -279,10 +279,12 @@ def main():
                     path_way = 0
                     if (simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"][0]):
                         path_way = 1
+                    if(current_leaf[path_way] == None):
+                        current_leaf[path_way] = {"condition" : None, 0 : None, 1 : None}
                     current_leaf = current_leaf[path_way]
                     simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"].pop(0)
                     simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].pop(0)
-            print(simulation.EXECUTION_PATH_TREE)
+            #print(simulation.EXECUTION_PATH_TREE)
             #print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
             cont_concolic = True
             while(True):
