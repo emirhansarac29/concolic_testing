@@ -3,16 +3,17 @@ contract greeter {
 
 
     /* main function */
-    function greet(bool a, uint72 b, uint256 f, int72 e, int256 ss) returns (uint256) {
+    function greet(bool a, int256 b, int256 c) returns (uint256) {
 
+        int256 d = b*c;
         if(a == true) {
-            if(ss == 12) {
+            if(a == false) {
                 return 1;
             } else {
                 return 2;
             }
         } else {
-            if(ss == 55) {
+            if(d == 55) {
                 return 3;
             } else {
                 return 4;

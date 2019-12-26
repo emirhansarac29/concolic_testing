@@ -152,6 +152,7 @@ def reset_and_set_initials(trace, number_of_pars, hex_f_id):
             temp_2 = temp
             temp = temp[a]
         temp_2[t_trace[len(t_trace)-1]] = "unsat"
+        print("UNSATISFIED TRACE DETECTED")
         return "unsat"
     else:
         model = solver_next.model()
