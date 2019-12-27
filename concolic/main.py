@@ -232,7 +232,7 @@ def main():
 
     FUNCTIONS = find_functions(FILE_OPCODES)
     for a in FUNCTIONS:
-        print(str(a.begin) + " <-> " + str(a.signature))
+        print(str(a.begin) + " <-> " + str(a.signature) + " (" + str(hex(int(a.signature))) + ")")
 
     FUNCTION_PARAMETERS = find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES)
     print(FUNCTION_PARAMETERS)
@@ -251,8 +251,11 @@ def main():
             hex_f_id = "0x" + str(("0" * h_l)) + hex_f_id
         else:
             hex_f_id = "0x" + hex_f_id
+        simulation.reset_inputs()
+        simulation.EXECUTION_PATH_TREE = {"condition" : None, 0 : None, 1 : None}
         simulation.CONTRACT_PROPERTIES['exec']['calldata'] = hex_f_id + ((64*number_of_pars) * "1")
         simulation.GLOBAL_STATE["pc"] = 0
+        print("FUNCTION " + str(hex_f_id) + " will be tested")
 
         while(True):
             print("EXECUTION PARS --> " + str(simulation.CONTRACT_PROPERTIES['exec']['calldata']))
