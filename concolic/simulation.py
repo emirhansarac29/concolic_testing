@@ -1850,37 +1850,6 @@ def reset_inputs():
     SYM_MEMORY = helper.GrowingList()
     SYM_PATH_CONDITIONS_AND_VARS = {"path_condition": [], "path_condition_status": []}
     SYM_STORAGE = {}
-    CONTRACT_PROPERTIES = {
-        "env": {
-            "currentCoinbase": "0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba",  # COINBASE
-            "currentDifficulty": "0x0100",  # DIFFICULTY
-            "currentGasLimit": "0x0f4240",  # GASLIMIT
-            "currentNumber": "0x00",  # NUMBER
-            "currentTimestamp": "0x00"  # TIMESTAMP
-        },
-        "exec": {
-            "data": "0xff",
-            "calldata": "0xfbac12f386434657432ababbaccccccdddff1231256787ac12f386434657432ababbaccccccdddfac12f386434657432ababbaccccccdddf",
-            # CALLDATALOAD-CALLDATASIZE-CALLDATACOPY, input data
-            "gas": "0x0186a0",
-            "gasPrice": "0x5af3107a4000",  # GASPRICE
-            "origin": "0xcd1722f3947def4cf144679da39c4c32bdc35681",  # origin address, sender of original transaction.
-            "value": "0x0"  # CALLVALUE, deposited value by the instruction/transaction
-        },
-        "gas": "0x013874",
-        "Is": {
-            "address": "0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6",  # CALLER, directly responsible for this execution.
-            "balance": "0xbb"  # CALL, their balance
-        },
-        "Ia": {
-            "address": "0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6",  # ORIGIN, currently executing account.
-            "balance": "0xcc",  # CALL, my balance
-            "storage": {
-                "0x00": "0x2222"
-            }
-        },
-        "IH_BLOCKHASH": "0x0012"  # BLOCKHASH
-    }
 
     """ if (is_all_real(transfer_amount)):
                     if (transfer_amount == 0):

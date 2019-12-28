@@ -77,8 +77,7 @@ def find_basic_blocks(FILE_OPCODES, FILE_PC_OPCODES):
             init_pc = FILE_PC_OPCODES[opc_number + 1]
     return basic_blocks
 
-
-def find_functions(FILE_OPCODES, FILE_PC_OPCODES, FILE_PC_TO_INDEX):
+def find_functions(FILE_OPCODES, FILE_PC_OPCODES):
     functions = []
     classes = []
     for num in range(0, len(FILE_OPCODES)):
@@ -92,7 +91,7 @@ def find_functions(FILE_OPCODES, FILE_PC_OPCODES, FILE_PC_TO_INDEX):
             if (FILE_OPCODES[num].name == "DUP1" and FILE_OPCODES[num + 1].name == "PUSH4" and FILE_OPCODES[
                 num + 2].name == "EQ" and re.search('PUSH*', FILE_OPCODES[num + 3].name) and FILE_OPCODES[
                 num + 4].name == "JUMPI"):
-                functions.append(FUNCTION(FILE_OPCODES[num + 3].par, FILE_OPCODES[num + 1].par, FILE_PC_OPCODES[class_position]))
+                functions.append(FUNCTION(FILE_OPCODES[num + 3].par + FILE_PC_OPCODES[class_position], FILE_OPCODES[num + 1].par, FILE_PC_OPCODES[class_position]))
     return functions
 
 
@@ -103,7 +102,7 @@ def find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES, FILE_PC_TO_INDEX):
 
         pos = 0
         for i in range(0, len(FILE_PC_OPCODES)):
-            if (FILE_PC_OPCODES[i] == func.begin + func.class_begin_pc):
+            if (FILE_PC_OPCODES[i] == func.begin):
                 pos = i
                 break
 
@@ -176,9 +175,32 @@ def reset_and_set_initials(trace, number_of_pars, hex_f_id):
                 if(h_l > 0):
                     val_hex = ("0" * h_l) + val_hex
                 exec_calldata = exec_calldata + val_hex
-        simulation.reset_inputs()
         simulation.CONTRACT_PROPERTIES['exec']['calldata'] = exec_calldata
-        simulation.GLOBAL_STATE["pc"] = 0
+        if ("IH_BLOCKHASH" in simulation.SYM_PATH_CONDITIONS_AND_VARS.keys()):
+            par = model[simulation.SYM_PATH_CONDITIONS_AND_VARS["IH_BLOCKHASH"]]
+            if(par != None):
+                simulation.CONTRACT_PROPERTIES["IH_BLOCKHASH"] = hex(int(str(par)))
+        if ("IH_COINBASE" in simulation.SYM_PATH_CONDITIONS_AND_VARS.keys()):
+            par = model[simulation.SYM_PATH_CONDITIONS_AND_VARS["IH_COINBASE"]]
+            if (par != None):
+                simulation.CONTRACT_PROPERTIES['env']['currentCoinbase'] = hex(int(str(par)))
+        if ("IH_TIMESTAMP" in simulation.SYM_PATH_CONDITIONS_AND_VARS.keys()):
+            par = model[simulation.SYM_PATH_CONDITIONS_AND_VARS["IH_TIMESTAMP"]]
+            if (par != None):
+                simulation.CONTRACT_PROPERTIES['env']['currentTimestamp'] = hex(int(str(par)))
+        if ("IH_NUMBER" in simulation.SYM_PATH_CONDITIONS_AND_VARS.keys()):
+            par = model[simulation.SYM_PATH_CONDITIONS_AND_VARS["IH_NUMBER"]]
+            if (par != None):
+                simulation.CONTRACT_PROPERTIES['env']['currentNumber'] = hex(int(str(par)))
+        if ("IH_DIFFICULTY" in simulation.SYM_PATH_CONDITIONS_AND_VARS.keys()):
+            par = model[simulation.SYM_PATH_CONDITIONS_AND_VARS["IH_DIFFICULTY"]]
+            if (par != None):
+                simulation.CONTRACT_PROPERTIES['env']['currentDifficulty'] = hex(int(str(par)))
+        if ("IH_GASLIMIT" in simulation.SYM_PATH_CONDITIONS_AND_VARS.keys()):
+            par = model[simulation.SYM_PATH_CONDITIONS_AND_VARS["IH_GASLIMIT"]]
+            if (par != None):
+                simulation.CONTRACT_PROPERTIES['env']['currentGasLimit'] = hex(int(str(par)))
+        simulation.reset_inputs()
         return "sat"
 
 
@@ -237,15 +259,15 @@ def main():
     #for i in basic_blocks:
     #    print(str(i.start) + " <-> " + str(i.end) + " <-> " + i.termination + " <-> " + str(i.targets))
 
-    FUNCTIONS = find_functions(FILE_OPCODES, FILE_PC_OPCODES, FILE_PC_TO_INDEX)
+    FUNCTIONS = find_functions(FILE_OPCODES, FILE_PC_OPCODES)
     for a in FUNCTIONS:
-        print(str(a.begin + a.class_begin_pc) + " <-> " + str(a.signature) + " (" + str(hex(int(a.signature))) + ")" + " class starts at pc  " + str(a.class_begin_pc))
+        print(str(a.begin) + " <-> " + str(a.signature) + " (" + str(hex(int(a.signature))) + ")" + " class starts at pc  " + str(a.class_begin_pc))
 
     FUNCTION_PARAMETERS = find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES, FILE_PC_TO_INDEX)
     print(FUNCTION_PARAMETERS)
     #print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
 
-"""
+
     # Only static parameters will be used, not string and bytes
     for function in FUNCTIONS:
         f_id = function.signature
@@ -262,10 +284,10 @@ def main():
         simulation.reset_inputs()
         simulation.EXECUTION_PATH_TREE = {"condition" : None, 0 : None, 1 : None}
         simulation.CONTRACT_PROPERTIES['exec']['calldata'] = hex_f_id + ((64*number_of_pars) * "1")
-        simulation.GLOBAL_STATE["pc"] = 0
         print("FUNCTION " + str(hex_f_id) + " will be tested")
 
         while(True):
+            simulation.GLOBAL_STATE["pc"] = function.class_begin_pc
             print("EXECUTION PARS --> " + str(simulation.CONTRACT_PROPERTIES['exec']['calldata']))
             while(True):
                 op_name = FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name
@@ -311,8 +333,7 @@ def main():
                     break
             if(cont_concolic == False):
                 break
-
-"""
+        print("\n")
 """
     print("STACK ---> " + str(simulation.STACK))
     print("SYM_STACK ---> " + str(simulation.SYM_STACK))
