@@ -1,7 +1,5 @@
 pragma solidity ^0.4.26;
 contract greeter {
-
-
     /* main function */
     function greet(bool a, int256 b, int256 c) returns (uint256) {
 
@@ -31,8 +29,13 @@ contract greeter {
         }
 
     }
+}
 
-
+contract ltl {
+    /* main function */
+    function dip(bool a) returns (uint256) {
+        return 555;
+    }
 
 }
 

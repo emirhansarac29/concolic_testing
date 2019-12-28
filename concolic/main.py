@@ -21,9 +21,10 @@ class OPCODE:
 
 
 class FUNCTION:
-    def __init__(self, begin, signature):
+    def __init__(self, begin, signature, class_begin_pc):
         self.begin = begin
         self.signature = signature
+        self.class_begin_pc = class_begin_pc
 
 
 def get_opcodes(bin_file):
@@ -77,26 +78,32 @@ def find_basic_blocks(FILE_OPCODES, FILE_PC_OPCODES):
     return basic_blocks
 
 
-def find_functions(FILE_OPCODES):
+def find_functions(FILE_OPCODES, FILE_PC_OPCODES, FILE_PC_TO_INDEX):
     functions = []
+    classes = []
     for num in range(0, len(FILE_OPCODES)):
-        if (FILE_OPCODES[num].name == "REVERT"):
-            break
-        if (FILE_OPCODES[num].name == "DUP1" and FILE_OPCODES[num + 1].name == "PUSH4" and FILE_OPCODES[
-            num + 2].name == "EQ" and re.search('PUSH*', FILE_OPCODES[num + 3].name) and FILE_OPCODES[
-            num + 4].name == "JUMPI"):
-            functions.append(FUNCTION(FILE_OPCODES[num + 3].par, FILE_OPCODES[num + 1].par))
+        if(num + 2 < len(FILE_OPCODES)):
+            if(FILE_OPCODES[num].name == "PUSH1" and FILE_OPCODES[num].par == 128 and FILE_OPCODES[num+1].name == "PUSH1" and FILE_OPCODES[num+1].par == 64 and FILE_OPCODES[num+2].name == "MSTORE" and FILE_OPCODES[num+2].par == ""):
+                classes.append(num)
+    for class_position in classes:
+        for num in range(class_position, len(FILE_OPCODES)):
+            if (FILE_OPCODES[num].name == "REVERT"):
+                break
+            if (FILE_OPCODES[num].name == "DUP1" and FILE_OPCODES[num + 1].name == "PUSH4" and FILE_OPCODES[
+                num + 2].name == "EQ" and re.search('PUSH*', FILE_OPCODES[num + 3].name) and FILE_OPCODES[
+                num + 4].name == "JUMPI"):
+                functions.append(FUNCTION(FILE_OPCODES[num + 3].par, FILE_OPCODES[num + 1].par, FILE_PC_OPCODES[class_position]))
     return functions
 
 
-def find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES):
+def find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES, FILE_PC_TO_INDEX):
     parameters = {}
     for func in FUNCTIONS:
         pars = []
 
         pos = 0
         for i in range(0, len(FILE_PC_OPCODES)):
-            if (FILE_PC_OPCODES[i] == func.begin):
+            if (FILE_PC_OPCODES[i] == func.begin + func.class_begin_pc):
                 pos = i
                 break
 
@@ -230,14 +237,15 @@ def main():
     #for i in basic_blocks:
     #    print(str(i.start) + " <-> " + str(i.end) + " <-> " + i.termination + " <-> " + str(i.targets))
 
-    FUNCTIONS = find_functions(FILE_OPCODES)
+    FUNCTIONS = find_functions(FILE_OPCODES, FILE_PC_OPCODES, FILE_PC_TO_INDEX)
     for a in FUNCTIONS:
-        print(str(a.begin) + " <-> " + str(a.signature) + " (" + str(hex(int(a.signature))) + ")")
+        print(str(a.begin + a.class_begin_pc) + " <-> " + str(a.signature) + " (" + str(hex(int(a.signature))) + ")" + " class starts at pc  " + str(a.class_begin_pc))
 
-    FUNCTION_PARAMETERS = find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES)
+    FUNCTION_PARAMETERS = find_parameters(FUNCTIONS, FILE_OPCODES, FILE_PC_OPCODES, FILE_PC_TO_INDEX)
     print(FUNCTION_PARAMETERS)
     #print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
 
+"""
     # Only static parameters will be used, not string and bytes
     for function in FUNCTIONS:
         f_id = function.signature
@@ -304,7 +312,7 @@ def main():
             if(cont_concolic == False):
                 break
 
-
+"""
 """
     print("STACK ---> " + str(simulation.STACK))
     print("SYM_STACK ---> " + str(simulation.SYM_STACK))
