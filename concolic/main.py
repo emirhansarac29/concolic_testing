@@ -272,7 +272,6 @@ def main():
     print(FUNCTION_PARAMETERS)
     #print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
 
-
     # Only static parameters will be used, not string and bytes
     for function in FUNCTIONS:
         f_id = function.signature
@@ -339,6 +338,7 @@ def main():
             if(cont_concolic == False):
                 break
         print("\n")
+    print(simulation.CONCOLIC_RESULTS)
 
 """
     print("STACK ---> " + str(simulation.STACK))

@@ -11,7 +11,7 @@ INITIALIZATION
 """
 GENERATOR = generator.Generator()
 ETHERSCAN_API = None
-
+CONCOLIC_RESULTS = []
 """
 SIMULATION ATOMS
 """
@@ -995,9 +995,16 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             size_data_ouput = SYM_STACK.pop()
 
 
-            print("CALL")
-            print(SYM_PATH_CONDITIONS_AND_VARS)
-
+            if(not is_all_real(transfer_amount)):
+                match = re.search("IH_TIMESTAMP", str(transfer_amount))
+                if(match):
+                    CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'], "warning": "TIMESTAMP BUG"})
+            path = ""
+            for a in SYM_PATH_CONDITIONS_AND_VARS["path_condition"]:
+                path = path + str(a)
+            match = re.search("IH_TIMESTAMP", path)
+            if(match):
+                CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'], "warning": "TIMESTAMP BUG"})
 
             if(transfer_amount == 0):
                 SYM_STACK.append(1)
