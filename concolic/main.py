@@ -200,6 +200,11 @@ def reset_and_set_initials(trace, number_of_pars, hex_f_id):
             par = model[simulation.SYM_PATH_CONDITIONS_AND_VARS["IH_GASLIMIT"]]
             if (par != None):
                 simulation.CONTRACT_PROPERTIES['env']['currentGasLimit'] = hex(int(str(par)))
+        if ("my_balance" in simulation.SYM_PATH_CONDITIONS_AND_VARS.keys()):
+            my_balance = BitVec("my_balance", 256)
+            par = model[my_balance]
+            if (par != None):
+                simulation.CONTRACT_PROPERTIES["Ia"]["balance"] = hex(int(str(par)))
         simulation.reset_inputs()
         return "sat"
 
@@ -291,7 +296,7 @@ def main():
             print("EXECUTION PARS --> " + str(simulation.CONTRACT_PROPERTIES['exec']['calldata']))
             while(True):
                 op_name = FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name
-                if (op_name == "RETURN" or op_name == "REVERT"):
+                if (op_name == "RETURN" or op_name == "REVERT" or op_name == "STOP"):
                     break
                 simulation.symbolic_execute_opcode(op_name, FILE_OPCODES,FILE_PC_OPCODES)
                 simulation.execute_opcode(op_name, FILE_OPCODES, FILE_PC_OPCODES)
@@ -334,6 +339,7 @@ def main():
             if(cont_concolic == False):
                 break
         print("\n")
+
 """
     print("STACK ---> " + str(simulation.STACK))
     print("SYM_STACK ---> " + str(simulation.SYM_STACK))

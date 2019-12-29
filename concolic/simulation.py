@@ -22,7 +22,7 @@ GLOBAL_STATE= {
 
 STACK = []              # all int in str format
 MEMORY = helper.GrowingList()             # Each element is 8 bit(1 byte) , 2 hex value  (LIKE ab not like 0xab)
-STORAGE = {}            # str(int) --> str(int)
+STORAGE = { "0": "2222"}            # str(int) --> str(int)
 
 """
 SYMBOLIC SIMULATION ATOMS
@@ -32,7 +32,7 @@ SYM_FIRST_CALLDATALOAD = True
 SYM_STACK = []          # all kept unsigned
 SYM_MEMORY = helper.GrowingList()
 SYM_PATH_CONDITIONS_AND_VARS = {"path_condition" : [], "path_condition_status" : []}   #IH_BLOCKHASH
-SYM_STORAGE = {}
+SYM_STORAGE = {0 : 2222}    #The first item in a storage slot is stored lower-order aligned.
 Symbolic_Solver = Solver()
 EXECUTION_PATH_TREE = {"condition" : None, 0 : None, 1 : None}
 """
@@ -61,16 +61,16 @@ CONTRACT_PROPERTIES = {
     "gas": "0x0186a0",
     "gasPrice": "0x5af3107a4000",                               #GASPRICE
     "origin": "0xcd1722f3947def4cf144679da39c4c32bdc35681",     #origin address, sender of original transaction.
-    "value": "0x0"                               #CALLVALUE, deposited value by the instruction/transaction
+    "value": "0x00"                               #CALLVALUE, deposited value by the instruction/transaction
   },
   "gas": "0x013874",
   "Is": {
   	"address": "0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6",    #CALLER, directly responsible for this execution.
-    "balance": "0xbb"                                           #CALL, their balance
+    "balance": "0xffffffffffffffffffffffffffffffff"             #CALL, their balance
   },
   "Ia": {
   	"address": "0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6",    #ORIGIN, currently executing account.
-    "balance": "0xcc",                                          #CALL, my balance
+    "balance": "0xffffffffffffffffffffffffffffffff",            #CALL, my balance
     "storage": {
       "0x00": "0x2222"
     }
@@ -994,6 +994,11 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             start_data_output = SYM_STACK.pop()
             size_data_ouput = SYM_STACK.pop()
 
+
+            print("CALL")
+            print(SYM_PATH_CONDITIONS_AND_VARS)
+
+
             if(transfer_amount == 0):
                 SYM_STACK.append(1)
                 return
@@ -1004,6 +1009,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 new_my_balance = BitVec(my_balance, 256)
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = new_my_balance - transfer_amount
             SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(SYM_PATH_CONDITIONS_AND_VARS[my_balance] >= 0)
+            SYM_REQUEST_COND = True
 
             other_balance = str(recipient) + "_balance"
             if (other_balance in SYM_PATH_CONDITIONS_AND_VARS):
@@ -1041,6 +1047,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 new_my_balance = BitVec(my_balance, 256)
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = new_my_balance - transfer_amount
             SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(SYM_PATH_CONDITIONS_AND_VARS[my_balance] >= 0)
+            SYM_REQUEST_COND = True
 
             other_balance = str(recipient) + "_balance"
             if (other_balance in SYM_PATH_CONDITIONS_AND_VARS):
@@ -1677,8 +1684,14 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
                 CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(CONTRACT_PROPERTIES["Is"]["balance"],16) + transfer_amount))
                 STACK.append("1")
+                if(SYM_REQUEST_COND):
+                    SYM_REQUEST_COND = False
+                    SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].append(True)
             else:
                 STACK.append("0")
+                if (SYM_REQUEST_COND):
+                    SYM_REQUEST_COND = False
+                    SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].append(False)
 
         else:
             raise ValueError('STACK underflow')
@@ -1700,8 +1713,14 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
                 CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(CONTRACT_PROPERTIES["Is"]["balance"], 16) + transfer_amount))
                 STACK.append("1")
+                if (SYM_REQUEST_COND):
+                    SYM_REQUEST_COND = False
+                    SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].append(True)
             else:
                 STACK.append("0")
+                if (SYM_REQUEST_COND):
+                    SYM_REQUEST_COND = False
+                    SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].append(False)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'RETURN'):  # DONE
@@ -1843,13 +1862,13 @@ def reset_inputs():
     GLOBAL_STATE = {"currentGas": 1000, "pc": 0}
     STACK = []
     MEMORY = helper.GrowingList()
-    STORAGE = {}
+    STORAGE = {"0": "2222"}
     SYM_REQUEST_COND = False
     SYM_FIRST_CALLDATALOAD = True
     SYM_STACK = []
     SYM_MEMORY = helper.GrowingList()
     SYM_PATH_CONDITIONS_AND_VARS = {"path_condition": [], "path_condition_status": []}
-    SYM_STORAGE = {}
+    SYM_STORAGE = {0: 2222}
 
     """ if (is_all_real(transfer_amount)):
                     if (transfer_amount == 0):
