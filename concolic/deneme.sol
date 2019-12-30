@@ -5,7 +5,8 @@ contract greeter {
 
     function greet2(address getter, uint256 c){
         status = true;
-        uint256 kol = now + c;
+        uint256 pat= block.number;
+        uint256 kol = pat + c;
         if(kol > 100000) {
              getter.call.value(123).gas(10)(abi.encodeWithSignature("register(string)", "MyName"));
         }else {

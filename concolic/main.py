@@ -339,17 +339,26 @@ def main():
                 break
         print("\n")
         ###     BEGIN TIMESTAMP BUG CHECK   ###
-        timestamp_bug = False
         test_var = ""
         if(len(simulation.TIMESTAMP_RESULTS) > 0):
             test_var = simulation.TIMESTAMP_RESULTS[0]
         for sent_ether in simulation.TIMESTAMP_RESULTS:
             if(str(test_var) != str(sent_ether)):
-                timestamp_bug = True
-                simulation.CONCOLIC_RESULTS.append({"function_and_inputs": str(hex_f_id), "warning": "TIMESTAMP BUG"})
+                simulation.CONCOLIC_RESULTS.append({"function_and_inputs": str(hex_f_id), "warning": "TIMESTAMP DEPENDENCY BUG"})
                 break
         simulation.TIMESTAMP_RESULTS = []
         ###     END TIMESTAMP BUG CHECK     ###
+
+        ###     BEGIN BLOCKNUMBER BUG CHECK   ###
+        test_var = ""
+        if (len(simulation.BLOCKNUMBER_RESULTS) > 0):
+            test_var = simulation.BLOCKNUMBER_RESULTS[0]
+        for sent_ether in simulation.BLOCKNUMBER_RESULTS:
+            if (str(test_var) != str(sent_ether)):
+                simulation.CONCOLIC_RESULTS.append({"function_and_inputs": str(hex_f_id), "warning": "BLOCKNUMBER DEPENDENCY BUG"})
+                break
+        simulation.BLOCKNUMBER_RESULTS = []
+        ###     END BLOCKNUMBER BUG CHECK     ###
 
     print(simulation.CONCOLIC_RESULTS)
 
