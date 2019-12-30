@@ -338,6 +338,19 @@ def main():
             if(cont_concolic == False):
                 break
         print("\n")
+        ###     BEGIN TIMESTAMP BUG CHECK   ###
+        timestamp_bug = False
+        test_var = ""
+        if(len(simulation.TIMESTAMP_RESULTS) > 0):
+            test_var = simulation.TIMESTAMP_RESULTS[0]
+        for sent_ether in simulation.TIMESTAMP_RESULTS:
+            if(str(test_var) != str(sent_ether)):
+                timestamp_bug = True
+                simulation.CONCOLIC_RESULTS.append({"function_and_inputs": str(hex_f_id), "warning": "TIMESTAMP BUG"})
+                break
+        simulation.TIMESTAMP_RESULTS = []
+        ###     END TIMESTAMP BUG CHECK     ###
+
     print(simulation.CONCOLIC_RESULTS)
 
 """

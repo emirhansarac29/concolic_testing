@@ -12,6 +12,7 @@ INITIALIZATION
 GENERATOR = generator.Generator()
 ETHERSCAN_API = None
 CONCOLIC_RESULTS = []
+TIMESTAMP_RESULTS = []
 """
 SIMULATION ATOMS
 """
@@ -998,13 +999,14 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             if(not is_all_real(transfer_amount)):
                 match = re.search("IH_TIMESTAMP", str(transfer_amount))
                 if(match):
-                    CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'], "warning": "TIMESTAMP BUG"})
+                    CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "warning": "TIMESTAMP BUG"})
             path = ""
             for a in SYM_PATH_CONDITIONS_AND_VARS["path_condition"]:
                 path = path + str(a)
             match = re.search("IH_TIMESTAMP", path)
             if(match):
-                CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'], "warning": "TIMESTAMP BUG"})
+                TIMESTAMP_RESULTS.append(transfer_amount)
+                #CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'], "warning": "TIMESTAMP BUG"})
 
             if(transfer_amount == 0):
                 SYM_STACK.append(1)
@@ -1043,6 +1045,19 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             size_data_input = SYM_STACK.pop()
             start_data_output = SYM_STACK.pop()
             size_data_ouput = SYM_STACK.pop()
+
+            if (not is_all_real(transfer_amount)):
+                match = re.search("IH_TIMESTAMP", str(transfer_amount))
+                if (match):
+                    CONCOLIC_RESULTS.append(
+                        {"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "warning": "TIMESTAMP BUG"})
+            path = ""
+            for a in SYM_PATH_CONDITIONS_AND_VARS["path_condition"]:
+                path = path + str(a)
+            match = re.search("IH_TIMESTAMP", path)
+            if (match):
+                TIMESTAMP_RESULTS.append(transfer_amount)
+                #CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'], "warning": "TIMESTAMP BUG"})
 
             if (transfer_amount == 0):
                 SYM_STACK.append(1)
