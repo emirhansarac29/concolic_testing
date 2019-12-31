@@ -17,6 +17,10 @@ ANALYSIS RESULTS
 CONCOLIC_RESULTS = []
 TIMESTAMP_RESULTS = []
 BLOCKNUMBER_RESULTS = []
+STORAGE_PLACES = []     # Each element --> "1"
+STORAGE_UPDATABLE_AT = {}       # Each element ---> "function_id" : ["1", "2"]
+STORAGE_IF_CONDITIONAL_SENDS = []   # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
+STORAGE_DIRECT_DEPENDANT_SENDS = [] # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
 """
 SIMULATION ATOMS
 """
@@ -27,7 +31,7 @@ GLOBAL_STATE= {
 
 STACK = []              # all int in str format
 MEMORY = helper.GrowingList()             # Each element is 8 bit(1 byte) , 2 hex value  (LIKE ab not like 0xab)
-STORAGE = { "0": "2222"}            # str(int) --> str(int)
+STORAGE = {}            # str(int) --> str(int)
 
 """
 SYMBOLIC SIMULATION ATOMS
@@ -37,7 +41,7 @@ SYM_FIRST_CALLDATALOAD = True
 SYM_STACK = []          # all kept unsigned
 SYM_MEMORY = helper.GrowingList()
 SYM_PATH_CONDITIONS_AND_VARS = {"path_condition" : [], "path_condition_status" : []}   #IH_BLOCKHASH
-SYM_STORAGE = {0 : 2222}    #The first item in a storage slot is stored lower-order aligned.
+SYM_STORAGE = {}    #The first item in a storage slot is stored lower-order aligned.
 Symbolic_Solver = Solver()
 EXECUTION_PATH_TREE = {"condition" : None, 0 : None, 1 : None}
 """
@@ -887,7 +891,14 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         if (len(SYM_STACK) > 0):
             first_arg = SYM_STACK.pop()
             if(is_all_real(first_arg)):
-                result = SYM_STORAGE[first_arg]
+                result = 0
+                if (first_arg in SYM_STORAGE.keys()):
+                    result = SYM_STORAGE[first_arg]
+                else:
+                    new_var_name = GENERATOR.gen_owner_store_var(first_arg)
+                    new_var = BitVec(new_var_name, 256)
+                    SYM_STORAGE[first_arg] = new_var
+                    result = new_var
                 SYM_STACK.append(result)
             else:
                 new_var_name = GENERATOR.gen_owner_store_var(first_arg)
@@ -905,7 +916,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
             new_var_name = GENERATOR.gen_owner_store_var(first_arg)
-            if (is_all_real(first_arg, second_arg)):
+            if (is_all_real(first_arg)):
                 SYM_STORAGE[first_arg] = second_arg
             else:
                 if (is_all_real(second_arg)):
@@ -999,6 +1010,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             start_data_output = SYM_STACK.pop()
             size_data_ouput = SYM_STACK.pop()
 
+            ###     TIMESTAMP
             if(not is_all_real(transfer_amount)):
                 match = re.search("IH_TIMESTAMP", str(transfer_amount))
                 if(match):
@@ -1009,12 +1021,12 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             match = re.search("IH_TIMESTAMP", path)
             if(match):
                 TIMESTAMP_RESULTS.append(transfer_amount)
-                #CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'], "warning": "TIMESTAMP BUG"})
 
+            ###     BLOCK NUMBER
             if (not is_all_real(transfer_amount)):
                 match = re.search("IH_NUMBER", str(transfer_amount))
                 if (match):
-                    CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'][0:10],
+                    CONCOLIC_RESULTS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10],
                                              "warning": "BLOCKNUMBER DEPENDENCY BUG"})
             path = ""
             for a in SYM_PATH_CONDITIONS_AND_VARS["path_condition"]:
@@ -1023,16 +1035,41 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             if (match):
                 BLOCKNUMBER_RESULTS.append(transfer_amount)
 
+            ###     TOD
+            if (not is_all_real(transfer_amount)):
+                storage_points = []
+                for storage in STORAGE_PLACES:
+                    match = re.search(("STORAGE_" + storage), str(transfer_amount))
+                    if (match):
+                        storage_points.append(storage)
+                if(len(storage_points) > 0):
+                    STORAGE_DIRECT_DEPENDANT_SENDS.append({"function" : CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages" : storage_points, "value" : str(transfer_amount)})
+
+            path = ""
+            for a in SYM_PATH_CONDITIONS_AND_VARS["path_condition"]:
+                path = path + str(a)
+            storage_points = []
+            for storage in STORAGE_PLACES:
+                match = re.search(("STORAGE_" + storage), str(path))
+                if (match):
+                    storage_points.append(storage)
+            if (len(storage_points) > 0):
+                STORAGE_IF_CONDITIONAL_SENDS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages": storage_points, "value": str(transfer_amount)})
+
             if(transfer_amount == 0):
                 SYM_STACK.append(1)
                 return
             my_balance = "my_balance"
             if(my_balance in SYM_PATH_CONDITIONS_AND_VARS):
+                SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
+                    If(UGT(SYM_PATH_CONDITIONS_AND_VARS[my_balance], transfer_amount - 1), 1, 0))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = SYM_PATH_CONDITIONS_AND_VARS[my_balance] - transfer_amount
             else:
                 new_my_balance = BitVec(my_balance, 256)
+                SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
+                    If(UGT(new_my_balance, transfer_amount - 1), 1, 0))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = new_my_balance - transfer_amount
-            SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(SYM_PATH_CONDITIONS_AND_VARS[my_balance] >= 0)
+            #SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(SYM_PATH_CONDITIONS_AND_VARS[my_balance] >= 0)
             SYM_REQUEST_COND = True
 
             other_balance = str(recipient) + "_balance"
@@ -1061,23 +1098,24 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             start_data_output = SYM_STACK.pop()
             size_data_ouput = SYM_STACK.pop()
 
+            ###     TIMESTAMP
             if (not is_all_real(transfer_amount)):
                 match = re.search("IH_TIMESTAMP", str(transfer_amount))
                 if (match):
                     CONCOLIC_RESULTS.append(
-                        {"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "warning": "TIMESTAMP DEPENDENCY BUG"})
+                        {"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "warning": "TIMESTAMP DEPENDENCY BUG"})
             path = ""
             for a in SYM_PATH_CONDITIONS_AND_VARS["path_condition"]:
                 path = path + str(a)
             match = re.search("IH_TIMESTAMP", path)
             if (match):
                 TIMESTAMP_RESULTS.append(transfer_amount)
-                #CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'], "warning": "TIMESTAMP BUG"})
 
+            ###     BLOCK NUMBER
             if (not is_all_real(transfer_amount)):
                 match = re.search("IH_NUMBER", str(transfer_amount))
                 if (match):
-                    CONCOLIC_RESULTS.append({"function_and_inputs": CONTRACT_PROPERTIES['exec']['calldata'][0:10],
+                    CONCOLIC_RESULTS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10],
                                              "warning": "BLOCKNUMBER DEPENDENCY BUG"})
             path = ""
             for a in SYM_PATH_CONDITIONS_AND_VARS["path_condition"]:
@@ -1086,16 +1124,41 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             if (match):
                 BLOCKNUMBER_RESULTS.append(transfer_amount)
 
+            ###     TOD
+            if (not is_all_real(transfer_amount)):
+                storage_points = []
+                for storage in STORAGE_PLACES:
+                    match = re.search(("STORAGE_" + storage), str(transfer_amount))
+                    if (match):
+                        storage_points.append(storage)
+                if (len(storage_points) > 0):
+                    STORAGE_DIRECT_DEPENDANT_SENDS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages": storage_points, "value": str(transfer_amount)})
+
+            path = ""
+            for a in SYM_PATH_CONDITIONS_AND_VARS["path_condition"]:
+                path = path + str(a)
+            storage_points = []
+            for storage in STORAGE_PLACES:
+                match = re.search(("STORAGE_" + storage), str(path))
+                if (match):
+                    storage_points.append(storage)
+            if (len(storage_points) > 0):
+                STORAGE_IF_CONDITIONAL_SENDS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages": storage_points, "value": str(transfer_amount)})
+
             if (transfer_amount == 0):
                 SYM_STACK.append(1)
                 return
             my_balance = "my_balance"
             if (my_balance in SYM_PATH_CONDITIONS_AND_VARS):
+                SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
+                    If(UGT(SYM_PATH_CONDITIONS_AND_VARS[my_balance], transfer_amount - 1), 1, 0))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = SYM_PATH_CONDITIONS_AND_VARS[my_balance] - transfer_amount
             else:
                 new_my_balance = BitVec(my_balance, 256)
+                SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
+                    If(UGT(new_my_balance, transfer_amount - 1), 1, 0))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = new_my_balance - transfer_amount
-            SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(SYM_PATH_CONDITIONS_AND_VARS[my_balance] >= 0)
+            #SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(SYM_PATH_CONDITIONS_AND_VARS[my_balance] >= 0)
             SYM_REQUEST_COND = True
 
             other_balance = str(recipient) + "_balance"
@@ -1624,7 +1687,13 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         if (len(STACK) > 0):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
-            result = STORAGE[first_arg]
+            if(not (first_arg in STORAGE_PLACES)):
+                STORAGE_PLACES.append(first_arg)
+            result = "0"
+            if(first_arg in STORAGE.keys()):
+                result = STORAGE[first_arg]
+            else:
+                STORAGE[first_arg] = "0"
             STACK.append(result)
         else:
             raise ValueError('STACK underflow')
@@ -1633,6 +1702,16 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
             first_arg = STACK.pop()
             second_arg = STACK.pop()
+            if (not (first_arg in STORAGE_PLACES)):
+                STORAGE_PLACES.append(first_arg)
+            fun_id = CONTRACT_PROPERTIES['exec']['calldata'][0:10]
+            if(first_arg in STORAGE_UPDATABLE_AT.keys()):
+                if(fun_id in STORAGE_UPDATABLE_AT[first_arg]):
+                    nothing = 1
+                else:
+                    STORAGE_UPDATABLE_AT[first_arg].append(fun_id)
+            else:
+                STORAGE_UPDATABLE_AT[first_arg] = [fun_id]
             STORAGE[first_arg] = second_arg
         else:
             raise ValueError('STACK underflow')
@@ -1911,13 +1990,13 @@ def reset_inputs():
     GLOBAL_STATE = {"currentGas": 1000, "pc": 0}
     STACK = []
     MEMORY = helper.GrowingList()
-    STORAGE = {"0": "2222"}
+    STORAGE = {}
     SYM_REQUEST_COND = False
     SYM_FIRST_CALLDATALOAD = True
     SYM_STACK = []
     SYM_MEMORY = helper.GrowingList()
     SYM_PATH_CONDITIONS_AND_VARS = {"path_condition": [], "path_condition_status": []}
-    SYM_STORAGE = {0: 2222}
+    SYM_STORAGE = {}
 
     """ if (is_all_real(transfer_amount)):
                     if (transfer_amount == 0):

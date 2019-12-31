@@ -12,6 +12,8 @@ import opcodes
 import basicblock
 import simulation
 
+# BLOCK NUMBER DEPENDENCY SOLVED
+# TIMESTAMP DEPENDENCY SOLVED
 NEXT_TRACE = []
 
 class OPCODE:
@@ -205,7 +207,15 @@ def reset_and_set_initials(trace, number_of_pars, hex_f_id):
             par = model[my_balance]
             if (par != None):
                 simulation.CONTRACT_PROPERTIES["Ia"]["balance"] = hex(int(str(par)))
+        storage_points = []
+        for item in simulation.STORAGE.keys():
+            storage_points.append(item)
         simulation.reset_inputs()
+        for item in storage_points:
+            storage = BitVec(simulation.GENERATOR.gen_owner_store_var(item), 256)
+            n_storage = model[storage]
+            if(n_storage != None):
+                simulation.STORAGE[item] = str(n_storage)
         return "sat"
 
 
@@ -344,7 +354,7 @@ def main():
             test_var = simulation.TIMESTAMP_RESULTS[0]
         for sent_ether in simulation.TIMESTAMP_RESULTS:
             if(str(test_var) != str(sent_ether)):
-                simulation.CONCOLIC_RESULTS.append({"function_and_inputs": str(hex_f_id), "warning": "TIMESTAMP DEPENDENCY BUG"})
+                simulation.CONCOLIC_RESULTS.append({"function": str(hex_f_id), "warning": "TIMESTAMP DEPENDENCY BUG"})
                 break
         simulation.TIMESTAMP_RESULTS = []
         ###     END TIMESTAMP BUG CHECK     ###
@@ -355,10 +365,61 @@ def main():
             test_var = simulation.BLOCKNUMBER_RESULTS[0]
         for sent_ether in simulation.BLOCKNUMBER_RESULTS:
             if (str(test_var) != str(sent_ether)):
-                simulation.CONCOLIC_RESULTS.append({"function_and_inputs": str(hex_f_id), "warning": "BLOCKNUMBER DEPENDENCY BUG"})
+                simulation.CONCOLIC_RESULTS.append({"function": str(hex_f_id), "warning": "BLOCKNUMBER DEPENDENCY BUG"})
                 break
         simulation.BLOCKNUMBER_RESULTS = []
         ###     END BLOCKNUMBER BUG CHECK     ###
+
+    ###     BEGIN TOD BUG CHECK     ###
+    #DIRECT DEPENDANT PART
+    for storage in simulation.STORAGE_PLACES:
+        if storage in simulation.STORAGE_UPDATABLE_AT.keys():
+            f_ids = simulation.STORAGE_UPDATABLE_AT[storage]
+            f_to_val = {}   #f_id -> values([])
+            for one in simulation.STORAGE_DIRECT_DEPENDANT_SENDS:
+                if storage in one["cond_storages"]:
+                    if one["function"] in f_to_val.keys():
+                        f_to_val[one["function"]].append(one["value"])
+                    else:
+                        f_to_val[one["function"]] = [one["value"]]
+            for function in f_to_val.keys():
+                for up_func in simulation.STORAGE_UPDATABLE_AT[storage]:
+                    if(up_func != function):
+                        simulation.CONCOLIC_RESULTS.append(
+                            {"function": str(function), "warning": "TOD DEPENDENCY BUG with STORAGE_" + str(storage)})
+                        break
+    #IF CONDITIONAL PART
+    for storage in simulation.STORAGE_PLACES:
+        if storage in simulation.STORAGE_UPDATABLE_AT.keys():
+            f_ids = simulation.STORAGE_UPDATABLE_AT[storage]
+            f_to_val = {}   #f_id -> values([])
+            for one in simulation.STORAGE_IF_CONDITIONAL_SENDS:
+                if storage in one["cond_storages"]:
+                    if one["function"] in f_to_val.keys():
+                        f_to_val[one["function"]].append(one["value"])
+                    else:
+                        f_to_val[one["function"]] = [one["value"]]
+            for function in f_to_val.keys():
+                for up_func in simulation.STORAGE_UPDATABLE_AT[storage]:
+                    if(up_func != function):
+                        all_same = True
+                        first_val = ""
+                        if(len(f_to_val[function]) > 0):
+                            first_val = f_to_val[function][0]
+                        for val in f_to_val[function]:
+                            if val != first_val:
+                                all_same = False
+                                break
+                        if(all_same == False):
+                            simulation.CONCOLIC_RESULTS.append(
+                                {"function": str(function),
+                                 "warning": "TOD DEPENDENCY BUG with STORAGE_" + str(storage)})
+                            break
+    ###     END TOD BUG CHECK     ###
+    # STORAGE_PLACES = []  # Each element --> "1"
+    # STORAGE_UPDATABLE_AT = {}  # Each element ---> "1" : ["0x12323", "0x23222"]
+    # STORAGE_IF_CONDITIONAL_SENDS = []  # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
+    # STORAGE_DIRECT_DEPENDANT_SENDS = []  # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
 
     print(simulation.CONCOLIC_RESULTS)
 

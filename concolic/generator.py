@@ -34,7 +34,7 @@ class Generator:
         return "some_address_" + str(self.count)
 
     def gen_owner_store_var(self, position, var_name=""):
-        return "storage_" + str(position)
+        return "STORAGE_" + str(position)
 
     def gen_gas_var(self):
         self.count += 1
