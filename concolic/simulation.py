@@ -1062,12 +1062,12 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             my_balance = "my_balance"
             if(my_balance in SYM_PATH_CONDITIONS_AND_VARS):
                 SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
-                    If(UGT(SYM_PATH_CONDITIONS_AND_VARS[my_balance], transfer_amount - 1), 1, 0))
+                    If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), 0, 1))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = SYM_PATH_CONDITIONS_AND_VARS[my_balance] - transfer_amount
             else:
                 new_my_balance = BitVec(my_balance, 256)
                 SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
-                    If(UGT(new_my_balance, transfer_amount - 1), 1, 0))
+                    If(UGT(transfer_amount, new_my_balance), 0, 1))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = new_my_balance - transfer_amount
             #SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(SYM_PATH_CONDITIONS_AND_VARS[my_balance] >= 0)
             SYM_REQUEST_COND = True
@@ -1151,12 +1151,12 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             my_balance = "my_balance"
             if (my_balance in SYM_PATH_CONDITIONS_AND_VARS):
                 SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
-                    If(UGT(SYM_PATH_CONDITIONS_AND_VARS[my_balance], transfer_amount - 1), 1, 0))
+                    If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), 0, 1))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = SYM_PATH_CONDITIONS_AND_VARS[my_balance] - transfer_amount
             else:
                 new_my_balance = BitVec(my_balance, 256)
                 SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
-                    If(UGT(new_my_balance, transfer_amount - 1), 1, 0))
+                    If(UGT(transfer_amount, new_my_balance), 0, 1))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = new_my_balance - transfer_amount
             #SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(SYM_PATH_CONDITIONS_AND_VARS[my_balance] >= 0)
             SYM_REQUEST_COND = True
@@ -1814,6 +1814,7 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 STACK.append("1")
                 if(SYM_REQUEST_COND):
                     SYM_REQUEST_COND = False
+                    print("IS ENOUGHHH")
                     SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].append(True)
             else:
                 STACK.append("0")

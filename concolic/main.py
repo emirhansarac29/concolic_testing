@@ -311,7 +311,7 @@ def main():
                 simulation.execute_opcode(op_name, FILE_OPCODES, FILE_PC_OPCODES)
 
             #print("PATH --> " + str(simulation.EXECUTION_PATH_TREE))
-            #print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
+            print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
             current_leaf = simulation.EXECUTION_PATH_TREE
             for cond in range(len(simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"])):
                 if(current_leaf["condition"] == None):
@@ -338,6 +338,7 @@ def main():
             while(True):
                 find_new_path_trace()
                 trace = NEXT_TRACE
+                print("TRACE --> " + str(trace))
                 NEXT_TRACE = []
                 if(trace == []):
                     cont_concolic = False
