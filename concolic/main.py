@@ -14,7 +14,9 @@ import simulation
 
 # BLOCK NUMBER DEPENDENCY SOLVED
 # TIMESTAMP DEPENDENCY SOLVED
+# TOD DEPENDENCY SOLVED
 NEXT_TRACE = []
+MAXIMUM_FUNCTION_RUN = 100
 
 class OPCODE:
     def __init__(self, name, par):
@@ -300,7 +302,9 @@ def main():
         simulation.CONTRACT_PROPERTIES['exec']['calldata'] = hex_f_id + ((64*number_of_pars) * "1")
         print("FUNCTION " + str(hex_f_id) + " will be tested")
 
+        remaining_run = MAXIMUM_FUNCTION_RUN
         while(True):
+            remaining_run = remaining_run - 1
             simulation.GLOBAL_STATE["pc"] = function.class_begin_pc
             print("EXECUTION PARS --> " + str(simulation.CONTRACT_PROPERTIES['exec']['calldata']))
             while(True):
@@ -311,7 +315,7 @@ def main():
                 simulation.execute_opcode(op_name, FILE_OPCODES, FILE_PC_OPCODES)
 
             #print("PATH --> " + str(simulation.EXECUTION_PATH_TREE))
-            print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
+            #print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
             current_leaf = simulation.EXECUTION_PATH_TREE
             for cond in range(len(simulation.SYM_PATH_CONDITIONS_AND_VARS["path_condition"])):
                 if(current_leaf["condition"] == None):
@@ -338,7 +342,7 @@ def main():
             while(True):
                 find_new_path_trace()
                 trace = NEXT_TRACE
-                print("TRACE --> " + str(trace))
+                #print("TRACE --> " + str(trace))
                 NEXT_TRACE = []
                 if(trace == []):
                     cont_concolic = False
@@ -346,7 +350,7 @@ def main():
                 found = reset_and_set_initials(trace, number_of_pars, hex_f_id)
                 if(found == "sat"):
                     break
-            if(cont_concolic == False):
+            if(cont_concolic == False or remaining_run == 0):
                 break
         print("\n")
         ###     BEGIN TIMESTAMP BUG CHECK   ###

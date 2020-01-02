@@ -1814,7 +1814,7 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 STACK.append("1")
                 if(SYM_REQUEST_COND):
                     SYM_REQUEST_COND = False
-                    print("IS ENOUGHHH")
+                    #print("IS ENOUGHHH")
                     SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"].append(True)
             else:
                 STACK.append("0")
