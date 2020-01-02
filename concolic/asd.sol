@@ -8,10 +8,10 @@ contract greeter {
     }
 
     function opp(address getter, int256 solution) {
-        if(solution == 44) {
-            getter.send(prize);
+        if(prize == 44) {
+            getter.send(10);
         }else {
-            getter.send(0);
+            getter.send(10);
         }
 
     }
@@ -31,7 +31,7 @@ contract greeter {
         if(temp > 100000) {
              getter.call.value(20).gas(10)(abi.encodeWithSignature("register(string)", "MyName"));
         }else {
-             getter.call.value(20).gas(10)(abi.encodeWithSignature("register(string)", "MyName"));
+             getter.call.value(10).gas(10)(abi.encodeWithSignature("register(string)", "MyName"));
         }
     }
 

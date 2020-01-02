@@ -15,11 +15,18 @@ ETHERSCAN_API = None
 ANALYSIS RESULTS
 """
 CONCOLIC_RESULTS = []
+
 TIMESTAMP_RESULTS = []
+TIMESTAMP_VAL_REQUEST = False
+
 BLOCKNUMBER_RESULTS = []
+BLOCKNUMBER_VAL_REQUEST = False
+
 STORAGE_PLACES = []     # Each element --> "1"
 STORAGE_UPDATABLE_AT = {}       # Each element ---> "function_id" : ["1", "2"]
 STORAGE_IF_CONDITIONAL_SENDS = []   # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
+STORAGE_IF_CONDITIONAL_SENDS_REQUEST = False
+STORAGE_IF_CONDITIONAL_SENDS_ELEMENT = {}
 STORAGE_DIRECT_DEPENDANT_SENDS = [] # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
 """
 SIMULATION ATOMS
@@ -92,6 +99,12 @@ CONTRACT_PROPERTIES = {
 222 --> STACK UNDERFLOW
 """
 def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
+    global SYM_FIRST_CALLDATALOAD
+    global SYM_REQUEST_COND
+    global TIMESTAMP_VAL_REQUEST
+    global BLOCKNUMBER_VAL_REQUEST
+    global STORAGE_IF_CONDITIONAL_SENDS_REQUEST
+    global STORAGE_IF_CONDITIONAL_SENDS_ELEMENT
     if(opcode == 'STOP'):
         return 444
     elif (opcode == 'ADD'):     # DONE
@@ -630,7 +643,6 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         result = int(result, 16)
         SYM_STACK.append(result)
     elif (opcode == 'CALLDATALOAD'):    # DONE
-        global SYM_FIRST_CALLDATALOAD
         if(len(SYM_STACK) > 0 and SYM_FIRST_CALLDATALOAD):
             first_arg = SYM_STACK.pop()
             data = CONTRACT_PROPERTIES['exec']['calldata']
@@ -934,7 +946,6 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'JUMPI'):           # DONE          True --> '1' , False --> '0'
-        global SYM_REQUEST_COND
         if (len(SYM_STACK) > 1):            ##TODO LATER
             first_arg = SYM_STACK.pop()
             second_arg = SYM_STACK.pop()
@@ -1020,7 +1031,8 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 path = path + str(a)
             match = re.search("IH_TIMESTAMP", path)
             if(match):
-                TIMESTAMP_RESULTS.append(transfer_amount)
+                TIMESTAMP_VAL_REQUEST = True
+                #TIMESTAMP_RESULTS.append(transfer_amount)
 
             ###     BLOCK NUMBER
             if (not is_all_real(transfer_amount)):
@@ -1033,7 +1045,8 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 path = path + str(a)
             match = re.search("IH_NUMBER", path)
             if (match):
-                BLOCKNUMBER_RESULTS.append(transfer_amount)
+                BLOCKNUMBER_VAL_REQUEST = True
+                #BLOCKNUMBER_RESULTS.append(transfer_amount)
 
             ###     TOD
             if (not is_all_real(transfer_amount)):
@@ -1054,7 +1067,9 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 if (match):
                     storage_points.append(storage)
             if (len(storage_points) > 0):
-                STORAGE_IF_CONDITIONAL_SENDS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages": storage_points, "value": str(transfer_amount)})
+                STORAGE_IF_CONDITIONAL_SENDS_REQUEST = True
+                STORAGE_IF_CONDITIONAL_SENDS_ELEMENT = {"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages": storage_points, "value": "not_det"}
+                #STORAGE_IF_CONDITIONAL_SENDS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages": storage_points, "value": str(transfer_amount)})
 
             if(transfer_amount == 0):
                 SYM_STACK.append(1)
@@ -1109,7 +1124,8 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 path = path + str(a)
             match = re.search("IH_TIMESTAMP", path)
             if (match):
-                TIMESTAMP_RESULTS.append(transfer_amount)
+                TIMESTAMP_VAL_REQUEST = True
+                #TIMESTAMP_RESULTS.append(transfer_amount)
 
             ###     BLOCK NUMBER
             if (not is_all_real(transfer_amount)):
@@ -1122,7 +1138,8 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 path = path + str(a)
             match = re.search("IH_NUMBER", path)
             if (match):
-                BLOCKNUMBER_RESULTS.append(transfer_amount)
+                BLOCKNUMBER_VAL_REQUEST = True
+                #BLOCKNUMBER_RESULTS.append(transfer_amount)
 
             ###     TOD
             if (not is_all_real(transfer_amount)):
@@ -1143,7 +1160,10 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 if (match):
                     storage_points.append(storage)
             if (len(storage_points) > 0):
-                STORAGE_IF_CONDITIONAL_SENDS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages": storage_points, "value": str(transfer_amount)})
+                STORAGE_IF_CONDITIONAL_SENDS_REQUEST = True
+                STORAGE_IF_CONDITIONAL_SENDS_ELEMENT = {"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10],
+                                                        "cond_storages": storage_points, "value": "not_det"}
+                #STORAGE_IF_CONDITIONAL_SENDS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages": storage_points, "value": str(transfer_amount)})
 
             if (transfer_amount == 0):
                 SYM_STACK.append(1)
@@ -1238,6 +1258,11 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
 1   --> OK
 """
 def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
+    global SYM_REQUEST_COND
+    global TIMESTAMP_VAL_REQUEST
+    global BLOCKNUMBER_VAL_REQUEST
+    global STORAGE_IF_CONDITIONAL_SENDS_REQUEST
+    global STORAGE_IF_CONDITIONAL_SENDS_ELEMENT
     if(opcode == 'STOP'):       # DONE
         GLOBAL_STATE["pc"] = GLOBAL_STATE["pc"] + 1
         return 444
@@ -1722,7 +1747,7 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'JUMPI'):           # DONE          True --> '1' , False --> '0'
-        global SYM_REQUEST_COND
+
         if (len(STACK) > 1):
             first_arg = int(STACK.pop())
             second_arg = STACK.pop()
@@ -1808,6 +1833,17 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             balance = int(CONTRACT_PROPERTIES["Ia"]["balance"],16)
             is_enough_fund = (transfer_amount <= balance)
 
+            if(TIMESTAMP_VAL_REQUEST):
+                TIMESTAMP_RESULTS.append(transfer_amount)
+                TIMESTAMP_VAL_REQUEST = False
+            if(BLOCKNUMBER_VAL_REQUEST):
+                BLOCKNUMBER_RESULTS.append(transfer_amount)
+                BLOCKNUMBER_VAL_REQUEST = False
+            if(STORAGE_IF_CONDITIONAL_SENDS_REQUEST):
+                STORAGE_IF_CONDITIONAL_SENDS_ELEMENT["value"] = transfer_amount
+                STORAGE_IF_CONDITIONAL_SENDS.append(STORAGE_IF_CONDITIONAL_SENDS_ELEMENT)
+                STORAGE_IF_CONDITIONAL_SENDS_REQUEST = False
+                STORAGE_IF_CONDITIONAL_SENDS_ELEMENT = {}
             if(is_enough_fund):
                 CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
                 CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(CONTRACT_PROPERTIES["Is"]["balance"],16) + transfer_amount))
@@ -1838,6 +1874,17 @@ def execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             balance = int(CONTRACT_PROPERTIES["Ia"]["balance"], 16)
             is_enough_fund = (transfer_amount <= balance)
 
+            if (TIMESTAMP_VAL_REQUEST):
+                TIMESTAMP_RESULTS.append(transfer_amount)
+                TIMESTAMP_VAL_REQUEST = False
+            if (BLOCKNUMBER_VAL_REQUEST):
+                BLOCKNUMBER_RESULTS.append(transfer_amount)
+                BLOCKNUMBER_VAL_REQUEST = False
+            if (STORAGE_IF_CONDITIONAL_SENDS_REQUEST):
+                STORAGE_IF_CONDITIONAL_SENDS_ELEMENT["value"] = transfer_amount
+                STORAGE_IF_CONDITIONAL_SENDS.append(STORAGE_IF_CONDITIONAL_SENDS_ELEMENT)
+                STORAGE_IF_CONDITIONAL_SENDS_REQUEST = False
+                STORAGE_IF_CONDITIONAL_SENDS_ELEMENT = {}
             if (is_enough_fund):
                 CONTRACT_PROPERTIES["Ia"]["balance"] = str(hex(balance - transfer_amount))
                 CONTRACT_PROPERTIES["Is"]["balance"] = str(hex(int(CONTRACT_PROPERTIES["Is"]["balance"], 16) + transfer_amount))
