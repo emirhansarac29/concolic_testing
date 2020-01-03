@@ -16,6 +16,7 @@ import simulation
 # TIMESTAMP DEPENDENCY SOLVED
 # TOD DEPENDENCY SOLVED
 # REENTRANCY SOLVED
+# MISHANDLED EXCEPTION SOLVED
 NEXT_TRACE = []
 MAXIMUM_FUNCTION_RUN = 100
 
@@ -157,6 +158,8 @@ def reset_and_set_initials(trace, number_of_pars, hex_f_id):
         else:
             solver_next.add(root["condition"] == True)
             root = root[1]
+    for mis_pos in range(len(simulation.MISHANDLED_EXCEPTION_SYM_VAR_EQS)):
+        solver_next.add(simulation.MISHANDLED_EXCEPTION_SYM_VARS[mis_pos] == simulation.MISHANDLED_EXCEPTION_SYM_VAR_EQS[mis_pos])
     if(solver_next.check() != z3.sat):
         temp_2 = temp
         for a in t_trace:
@@ -317,6 +320,13 @@ def main():
             #print(simulation.MEMORY)
             #print(simulation.STORAGE)
 
+            ###     BEGIN MISHANDLED EXCEPTION BUG CHECK   ###
+            for element_m_ex_ret in simulation.MISHANDLED_EXCEPTION_SYM_VARS:
+                if(str(element_m_ex_ret) not in simulation.MISHANDLED_CHECKED_RETURNS):
+                    simulation.CONCOLIC_RESULTS.append({"function": str(hex_f_id), "warning": "MISHANDLED EXCEPTION BUG"})
+                    break
+            ###     END MISHANDLED EXCEPTION BUG CHECK     ###
+
             #print("PATH --> " + str(simulation.EXECUTION_PATH_TREE))
             #print(simulation.SYM_PATH_CONDITIONS_AND_VARS)
             current_leaf = simulation.EXECUTION_PATH_TREE
@@ -430,6 +440,10 @@ def main():
     # STORAGE_DIRECT_DEPENDANT_SENDS = []  # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
 
     print(simulation.CONCOLIC_RESULTS)
+
+
+if __name__ == '__main__':
+    main()
 
 """
     print("STACK ---> " + str(simulation.STACK))
@@ -556,8 +570,23 @@ def main():
     #print((xxx*yyy)%zzz)
 """
 
-if __name__ == '__main__':
-    main()
+"""
+    simulation.CONTRACT_PROPERTIES['exec']['calldata'] = "0xa3af609b"
+    for a in range(40):
+        op_name = FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name
+        if (op_name == "RETURN" or op_name == "REVERT" or op_name == "STOP"):
+            break
+        simulation.symbolic_execute_opcode(op_name, FILE_OPCODES, FILE_PC_OPCODES)
+        simulation.execute_opcode(op_name, FILE_OPCODES, FILE_PC_OPCODES)
+    print("STACK ---> " + str(simulation.STACK))
+    print("SYM_STACK ---> " + str(simulation.SYM_STACK))
+    print("STORAGE ---> " + str(simulation.STORAGE))
+    print("SYM_STORAGE ---> " + str(simulation.SYM_STORAGE))
+    print("SYM_PATH_CONDITIONS_AND_VARS ---> " + str(simulation.SYM_PATH_CONDITIONS_AND_VARS))
+    print(simulation.GLOBAL_STATE)
+    print(len(simulation.STACK) == len(simulation.SYM_STACK))
+    print(simulation.EXECUTION_PATH_TREE)
+"""
 
 """
 395  solc --opcodes asd.sol 

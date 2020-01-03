@@ -30,6 +30,8 @@ STORAGE_IF_CONDITIONAL_SENDS_ELEMENT = {}
 STORAGE_DIRECT_DEPENDANT_SENDS = [] # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
 
 MISHANDLED_EXCEPTION_SYM_VARS = []
+MISHANDLED_EXCEPTION_SYM_VAR_EQS = []
+MISHANDLED_CHECKED_RETURNS = []
 """
 SIMULATION ATOMS
 """
@@ -495,6 +497,9 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 SYM_STACK.append(result)
             else:
                 first_arg = to_symbolic(first_arg)
+                for mis_exc_ret in MISHANDLED_EXCEPTION_SYM_VARS:
+                    if(re.search(str(mis_exc_ret), str(first_arg))):
+                        MISHANDLED_CHECKED_RETURNS.append(str(mis_exc_ret))
                 result = If(first_arg == 0, BitVecVal(1, 256), BitVecVal(0, 256))
                 if (is_symbolic(result)):
                     SYM_STACK.append(simplify(result))
@@ -1085,17 +1090,22 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             if(SOLVER_REENTRANCY.check() == z3.sat):
                 CONCOLIC_RESULTS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "warning": "REENTRANCY BUG"})
 
-            if(transfer_amount == 0):
-                mishandled_sym = BitVec(GENERATOR.gen_mishandled_return(), 256)
-                SYM_STACK.append(1)
-                return
+            #if(transfer_amount == 0):
+            #    mishandled_sym = BitVec(GENERATOR.gen_mishandled_return(), 256)
+            #    SYM_STACK.append(mishandled_sym)
+            #    return
+            ### Mishandled Exception
+            mishandled_sym = BitVec(GENERATOR.gen_mishandled_return(), 256)
+            MISHANDLED_EXCEPTION_SYM_VARS.append(mishandled_sym)
             my_balance = "my_balance"
             if(my_balance in SYM_PATH_CONDITIONS_AND_VARS):
+                MISHANDLED_EXCEPTION_SYM_VAR_EQS.append(If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), 0, 1))
                 SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
-                    If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), 0, 1))
+                    If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), BitVecVal(0, 256), BitVecVal(1, 256)))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = SYM_PATH_CONDITIONS_AND_VARS[my_balance] - transfer_amount
             else:
                 new_my_balance = BitVec(my_balance, 256)
+                MISHANDLED_EXCEPTION_SYM_VAR_EQS.append(If(UGT(transfer_amount, new_my_balance), BitVecVal(0, 256), BitVecVal(1, 256)))
                 SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
                     If(UGT(transfer_amount, new_my_balance), 0, 1))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = new_my_balance - transfer_amount
@@ -1108,7 +1118,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             else:
                 new_other_balance = BitVec(other_balance, 256)
                 SYM_PATH_CONDITIONS_AND_VARS[other_balance] = new_other_balance + transfer_amount
-            SYM_STACK.append(1)
+            SYM_STACK.append(mishandled_sym)
 
                 #if (is_enough_fund):
                 #   SYM_CONTRACT_PROPERTIES["Ia"]["balance"] = balance - transfer_amount
@@ -1192,16 +1202,21 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             if (SOLVER_REENTRANCY.check() == z3.sat):
                 CONCOLIC_RESULTS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "warning": "REENTRANCY BUG"})
 
-            if (transfer_amount == 0):
-                SYM_STACK.append(1)
-                return
+            #if (transfer_amount == 0):
+            #    SYM_STACK.append(1)
+            #    return
+            ### Mishandled Exception
+            mishandled_sym = BitVec(GENERATOR.gen_mishandled_return(), 256)
+            MISHANDLED_EXCEPTION_SYM_VARS.append(mishandled_sym)
             my_balance = "my_balance"
             if (my_balance in SYM_PATH_CONDITIONS_AND_VARS):
+                MISHANDLED_EXCEPTION_SYM_VAR_EQS.append(If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), 0, 1))
                 SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
                     If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), 0, 1))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = SYM_PATH_CONDITIONS_AND_VARS[my_balance] - transfer_amount
             else:
                 new_my_balance = BitVec(my_balance, 256)
+                MISHANDLED_EXCEPTION_SYM_VAR_EQS.append(If(UGT(transfer_amount, new_my_balance), BitVecVal(0, 256), BitVecVal(1, 256)))
                 SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
                     If(UGT(transfer_amount, new_my_balance), 0, 1))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = new_my_balance - transfer_amount
@@ -1215,7 +1230,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             else:
                 new_other_balance = BitVec(other_balance, 256)
                 SYM_PATH_CONDITIONS_AND_VARS[other_balance] = new_other_balance + transfer_amount
-            SYM_STACK.append(1)
+            SYM_STACK.append(mishandled_sym)
         else:
             raise ValueError('STACK underflow')
     elif (opcode == 'RETURN'):  # DONE
@@ -2061,6 +2076,9 @@ def reset_inputs():
     global SYM_STORAGE
     global EXECUTION_PATH_TREE
     global CONTRACT_PROPERTIES
+    global MISHANDLED_EXCEPTION_SYM_VARS
+    global MISHANDLED_EXCEPTION_SYM_VAR_EQS
+    global MISHANDLED_CHECKED_RETURNS
     GENERATOR = generator.Generator()
     GLOBAL_STATE = {"currentGas": 1000, "pc": 0}
     STACK = []
@@ -2072,6 +2090,9 @@ def reset_inputs():
     SYM_MEMORY = helper.GrowingList()
     SYM_PATH_CONDITIONS_AND_VARS = {"path_condition": [], "path_condition_status": []}
     SYM_STORAGE = {}
+    MISHANDLED_EXCEPTION_SYM_VARS = []
+    MISHANDLED_EXCEPTION_SYM_VAR_EQS = []
+    MISHANDLED_CHECKED_RETURNS = []
 
     """ if (is_all_real(transfer_amount)):
                     if (transfer_amount == 0):

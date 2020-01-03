@@ -6,12 +6,13 @@ contract greeter {
     uint public MinDeposit = 1 ether;
     bool lock_send = false;
 
-    function Deposit() public payable {
-        if(msg.value >= MinDeposit) {
-            balances[msg.sender]+=msg.value;
+    function Deposit(uint amount) public payable {
+        if(amount >= MinDeposit) {
+            balances[msg.sender]+=amount;
         }
     }
 
+    /*
     function CashOut_1(uint amount) payable{
         require(amount != 0 && balances[msg.sender] >= amount);
 
@@ -21,7 +22,7 @@ contract greeter {
         msg.sender.transfer(amount);
         balances[msg.sender] = current_balance - amount;
     }
-/*
+
     function CashOut_2(uint amount) payable {
         require(!lock_send);
         lock_send = true;
