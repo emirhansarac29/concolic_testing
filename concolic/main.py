@@ -313,6 +313,8 @@ def main():
                     break
                 simulation.symbolic_execute_opcode(op_name, FILE_OPCODES,FILE_PC_OPCODES)
                 simulation.execute_opcode(op_name, FILE_OPCODES, FILE_PC_OPCODES)
+            #print(simulation.MEMORY)
+            #print(simulation.STORAGE)
 
             #print("PATH --> " + str(simulation.EXECUTION_PATH_TREE))
             #print(simulation.SYM_PATH_CONDITIONS_AND_VARS)

@@ -77,7 +77,7 @@ CONTRACT_PROPERTIES = {
     "gas": "0x0186a0",
     "gasPrice": "0x5af3107a4000",                               #GASPRICE
     "origin": "0xcd1722f3947def4cf144679da39c4c32bdc35681",     #origin address, sender of original transaction.
-    "value": "0x00"                               #CALLVALUE, deposited value by the instruction/transaction
+    "value": "0x10"                               #CALLVALUE, deposited value by the instruction/transaction
   },
   "gas": "0x013874",
   "Is": {
@@ -1070,6 +1070,21 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 STORAGE_IF_CONDITIONAL_SENDS_REQUEST = True
                 STORAGE_IF_CONDITIONAL_SENDS_ELEMENT = {"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages": storage_points, "value": "not_det"}
                 #STORAGE_IF_CONDITIONAL_SENDS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "cond_storages": storage_points, "value": str(transfer_amount)})
+
+            ### REENTRANCY
+
+            SOLVER_REENTRANCY = Solver()
+            total_cond = len(SYM_PATH_CONDITIONS_AND_VARS["path_condition"])
+            for acnd in range(total_cond):
+                SOLVER_REENTRANCY.add(SYM_PATH_CONDITIONS_AND_VARS["path_condition"][acnd] == SYM_PATH_CONDITIONS_AND_VARS["path_condition_status"][acnd])
+            for reent_str in STORAGE:
+                sym_var = BitVec(GENERATOR.gen_owner_store_var(reent_str), 256)
+                sym_val = int(STORAGE[reent_str])
+                SOLVER_REENTRANCY.add(sym_var == sym_val)
+            if(SOLVER_REENTRANCY.check() == z3.sat):
+                CONCOLIC_RESULTS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "warning": "REENTRANCY BUG"})
+
+            #print("STOROAGEEE  ---> " + str(STORAGE))
 
             if(transfer_amount == 0):
                 SYM_STACK.append(1)

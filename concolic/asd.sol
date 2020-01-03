@@ -1,12 +1,31 @@
 pragma solidity ^0.4.26;
 contract greeter {
 
-    uint256 prize = 50;
 
-    function setPrize(uint256 pp) {
-        prize = pp;
+    mapping (address => uint) public balances;
+    uint public MinDeposit = 1 ether;
+    bool lock_send = false;
+
+    function Deposit() public payable {
+        if(msg.value >= MinDeposit) {
+            balances[msg.sender]+=msg.value;
+        }
     }
 
+    function CashOut(uint _am) payable{
+        require(balances[msg.sender] >= _am);
+        if(!lock_send) {
+
+            msg.sender.transfer(_am);
+            balances[msg.sender] -= _am;
+            lock_send = true;
+        }
+
+    }
+
+
+    /*
+    uint256 prize = 50;
     function opp(address getter, int256 solution) {
         if(prize == 44) {
             getter.send(10);
@@ -54,6 +73,6 @@ contract greeter {
             }
         }
     }
-
+    */
 }
 
