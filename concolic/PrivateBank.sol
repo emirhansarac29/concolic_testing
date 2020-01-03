@@ -2,6 +2,8 @@ pragma solidity ^0.4.26;
 
 contract PrivateBank {
 
+    // THIS IS AN EXAMPLE OF CONTRACT THAT DEMONSTRATE REENTRANCY BUG AND SOLUTIONS (Got from ContractFuzzer)
+
     mapping (address => uint) public balances;
     uint public MinDeposit = 1 ether;
     bool lock_send = false;
