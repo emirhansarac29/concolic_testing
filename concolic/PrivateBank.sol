@@ -14,6 +14,17 @@ contract PrivateBank {
         }
     }
 
+    function CashOut_2(uint amount) payable {
+        require(!lock_send);
+        lock_send = true;
+
+        require(balances[msg.sender] >= amount);
+        msg.sender.transfer(amount);
+        balances[msg.sender] -= amount;
+
+        lock_send = false;
+    }
+
     /*
     function CashOut_1(uint amount) payable{
         require(amount != 0 && balances[msg.sender] >= amount);

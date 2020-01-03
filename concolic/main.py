@@ -439,8 +439,36 @@ def main():
     # STORAGE_IF_CONDITIONAL_SENDS = []  # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
     # STORAGE_DIRECT_DEPENDANT_SENDS = []  # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
 
-    print(simulation.CONCOLIC_RESULTS)
-
+    #print(simulation.CONCOLIC_RESULTS)
+    TIMESTAMP_DETECTION = False
+    MISHANDLED_EXCEPTION_DETECTION = False
+    REENTRANCY_DETECTION = False
+    BLOCKNUMBER_DETECTION = False
+    TOD_DETECTION = False
+    for res in simulation.CONCOLIC_RESULTS:
+        if (res["warning"] == "TIMESTAMP DEPENDENCY BUG"):
+            TIMESTAMP_DETECTION = True
+        elif (res["warning"] == "MISHANDLED EXCEPTION BUG"):
+            MISHANDLED_EXCEPTION_DETECTION = True
+        elif (res["warning"] == "REENTRANCY BUG"):
+            REENTRANCY_DETECTION = True
+        elif (res["warning"] == "BLOCKNUMBER DEPENDENCY BUG"):
+            BLOCKNUMBER_DETECTION = True
+        else:
+            TOD_DETECTION = True
+    print("\n\n ####   RESULTS   ###")
+    if not (TIMESTAMP_DETECTION or MISHANDLED_EXCEPTION_DETECTION or REENTRANCY_DETECTION or BLOCKNUMBER_DETECTION or TOD_DETECTION):
+        print("THERE IS NO DETECTION OF WARNING")
+    if (TIMESTAMP_DETECTION):
+        print("TIMESTAMP DEPENDENCY DETECTED")
+    if (BLOCKNUMBER_DETECTION):
+        print("BLOCKNUMBER DEPENDENCY DETECTED")
+    if (MISHANDLED_EXCEPTION_DETECTION):
+        print("MISHANDLED EXCEPTION DETECTED")
+    if (REENTRANCY_DETECTION):
+        print("REENTRANCY DETECTED")
+    if (TOD_DETECTION):
+        print("TRANSACTION-ORDERING DEPENDENCE(TOD) DETECTED")
 
 if __name__ == '__main__':
     main()

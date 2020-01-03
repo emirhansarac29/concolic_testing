@@ -81,7 +81,7 @@ CONTRACT_PROPERTIES = {
     "gas": "0x0186a0",
     "gasPrice": "0x5af3107a4000",                               #GASPRICE
     "origin": "0xcd1722f3947def4cf144679da39c4c32bdc35681",     #origin address, sender of original transaction.
-    "value": "0x10"                               #CALLVALUE, deposited value by the instruction/transaction
+    "value": "0x00"                               #CALLVALUE, deposited value by the instruction/transaction
   },
   "gas": "0x013874",
   "Is": {
@@ -1038,7 +1038,10 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 path = path + str(a)
             match = re.search("IH_TIMESTAMP", path)
             if(match):
-                TIMESTAMP_VAL_REQUEST = True
+                if (is_all_real(transfer_amount)):
+                    TIMESTAMP_VAL_REQUEST = True
+                else:
+                    TIMESTAMP_RESULTS.append(str(transfer_amount))
                 #TIMESTAMP_RESULTS.append(transfer_amount)
 
             ###     BLOCK NUMBER
@@ -1052,7 +1055,10 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 path = path + str(a)
             match = re.search("IH_NUMBER", path)
             if (match):
-                BLOCKNUMBER_VAL_REQUEST = True
+                if (is_all_real(transfer_amount)):
+                    BLOCKNUMBER_VAL_REQUEST = True
+                else:
+                    BLOCKNUMBER_RESULTS.append(str(transfer_amount))
                 #BLOCKNUMBER_RESULTS.append(transfer_amount)
 
             ###     TOD
@@ -1149,7 +1155,10 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 path = path + str(a)
             match = re.search("IH_TIMESTAMP", path)
             if (match):
-                TIMESTAMP_VAL_REQUEST = True
+                if (is_all_real(transfer_amount)):
+                    TIMESTAMP_VAL_REQUEST = True
+                else:
+                    TIMESTAMP_RESULTS.append(str(transfer_amount))
                 #TIMESTAMP_RESULTS.append(transfer_amount)
 
             ###     BLOCK NUMBER
@@ -1163,7 +1172,10 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
                 path = path + str(a)
             match = re.search("IH_NUMBER", path)
             if (match):
-                BLOCKNUMBER_VAL_REQUEST = True
+                if(is_all_real(transfer_amount)):
+                    BLOCKNUMBER_VAL_REQUEST = True
+                else:
+                    BLOCKNUMBER_RESULTS.append(str(transfer_amount))
                 #BLOCKNUMBER_RESULTS.append(transfer_amount)
 
             ###     TOD

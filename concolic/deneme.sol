@@ -11,40 +11,22 @@ contract greeter {
     function opp(address getter) {
         uint256 kel = 22222;
         if(owner == 44) {
-            getter.send(price);
+            getter.send(12);
             //getter.call.value(kel + 2).gas(price)(abi.encodeWithSignature("register(string)", "MyName"));
         }else {
-            getter.send(price);
+            getter.send(13);
             //getter.call.value(kel + 2).gas(price)(abi.encodeWithSignature("register(string)", "MyName"));
         }
 
-    }
-
-    function greet3(address getter, uint256 c){
-        price = c;
-        uint256 kol = now + c;
-        if(kol > 100000) {
-             getter.call.value(kol).gas(10)(abi.encodeWithSignature("register(string)", "MyName"));
-        }else {
-             getter.call.value(kol).gas(10)(abi.encodeWithSignature("register(string)", "MyName"));
-        }
-    }
-
-    function greet2(address getter, uint256 c){
-
-        uint256 pat= block.number;
-        uint256 kol = pat + c;
-        if(kol > 100000) {
-             getter.call.value(123).gas(10)(abi.encodeWithSignature("register(string)", "MyName"));
-        }else {
-             getter.call.value(321).gas(10)(abi.encodeWithSignature("register(string)", "MyName"));
-        }
     }
 
     function setPrize(int256 np, uint256 pp) {
         owner = np;
-        price = pp;
+        //price = pp;
     }
+/*
+
+
 
     function deneme(int256 den)returns (uint256){
         if(owner == 33) {
@@ -59,6 +41,6 @@ contract greeter {
             return 4;
         }
     }
-
+*/
 }
 
