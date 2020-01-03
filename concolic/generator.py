@@ -4,6 +4,7 @@ class Generator:
         self.countdata = 0
         self.count = 0
         self.parameter = 0
+        self.mishandled_count = 0
 
     def gen_stack_var(self):
         self.countstack += 1
@@ -68,3 +69,7 @@ class Generator:
     def gen_par_var(self):
         self.parameter += 1
         return "parameter_" + str(self.parameter)
+
+    def gen_mishandled_return(self):
+        self.parameter += 1
+        return "CALL_RETURN_" + str(self.parameter)

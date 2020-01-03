@@ -28,6 +28,8 @@ STORAGE_IF_CONDITIONAL_SENDS = []   # Each element ---> "function" : "$function_
 STORAGE_IF_CONDITIONAL_SENDS_REQUEST = False
 STORAGE_IF_CONDITIONAL_SENDS_ELEMENT = {}
 STORAGE_DIRECT_DEPENDANT_SENDS = [] # Each element ---> "function" : "$function_id", "cond_storages" : ["1", "2"], "value" : "$value"
+
+MISHANDLED_EXCEPTION_SYM_VARS = []
 """
 SIMULATION ATOMS
 """
@@ -1083,9 +1085,8 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             if(SOLVER_REENTRANCY.check() == z3.sat):
                 CONCOLIC_RESULTS.append({"function": CONTRACT_PROPERTIES['exec']['calldata'][0:10], "warning": "REENTRANCY BUG"})
 
-            #print("STOROAGEEE  ---> " + str(STORAGE))
-
             if(transfer_amount == 0):
+                mishandled_sym = BitVec(GENERATOR.gen_mishandled_return(), 256)
                 SYM_STACK.append(1)
                 return
             my_balance = "my_balance"
