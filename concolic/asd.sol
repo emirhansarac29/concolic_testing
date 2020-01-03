@@ -12,17 +12,27 @@ contract greeter {
         }
     }
 
-    function CashOut(uint _am) payable{
-        require(balances[msg.sender] >= _am);
-        if(!lock_send) {
+    function CashOut_1(uint amount) payable{
+        require(amount != 0 && balances[msg.sender] >= amount);
 
-            msg.sender.transfer(_am);
-            balances[msg.sender] -= _am;
-            lock_send = true;
-        }
+        uint current_balance = balances[msg.sender];
+        balances[msg.sender] = 0;
 
+        msg.sender.transfer(amount);
+        balances[msg.sender] = current_balance - amount;
     }
+/*
+    function CashOut_2(uint amount) payable {
+        require(!lock_send);
+        lock_send = true;
 
+        require(balances[msg.sender] >= amount);
+        msg.sender.transfer(amount);
+        balances[msg.sender] -= amount;
+
+        lock_send = false;
+    }
+*/
 
     /*
     uint256 prize = 50;
