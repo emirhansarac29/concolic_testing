@@ -288,6 +288,7 @@ def main():
     print(FUNCTION_PARAMETERS)
     #print("IT SHOULD BE NOTED THAT ---->  uint160 == address and uint256 == int256")
 
+    CODE_COVERAGE = []
     # Only static parameters will be used, not string and bytes
     for function in FUNCTIONS:
         f_id = function.signature
@@ -312,6 +313,8 @@ def main():
             simulation.GLOBAL_STATE["pc"] = function.class_begin_pc
             print("EXECUTION PARS --> " + str(simulation.CONTRACT_PROPERTIES['exec']['calldata']))
             while(True):
+                if(simulation.GLOBAL_STATE["pc"] not in CODE_COVERAGE):
+                    CODE_COVERAGE.append(simulation.GLOBAL_STATE["pc"])
                 op_name = FILE_OPCODES[FILE_PC_TO_INDEX[simulation.GLOBAL_STATE["pc"]]].name
                 if (op_name == "RETURN" or op_name == "REVERT" or op_name == "STOP"):
                     break
@@ -387,7 +390,9 @@ def main():
                 break
         simulation.BLOCKNUMBER_RESULTS = []
         ###     END BLOCKNUMBER BUG CHECK     ###
-
+    #print(simulation.STORAGE_PLACES)
+    #print(simulation.STORAGE_UPDATABLE_AT)
+    #print(simulation.STORAGE_IF_CONDITIONAL_SENDS)
     ###     BEGIN TOD BUG CHECK     ###
     #DIRECT DEPENDANT PART
     for storage in simulation.STORAGE_PLACES:
@@ -456,9 +461,14 @@ def main():
             BLOCKNUMBER_DETECTION = True
         else:
             TOD_DETECTION = True
+    err_count = 0
+    for opc_name in FILE_OPCODES:
+        if(opc_name.name == "ERROR"):
+            err_count += 1
     print("\n\n ####   RESULTS   ###")
     if not (TIMESTAMP_DETECTION or MISHANDLED_EXCEPTION_DETECTION or REENTRANCY_DETECTION or BLOCKNUMBER_DETECTION or TOD_DETECTION):
         print("THERE IS NO DETECTION OF WARNING")
+    print(("CODE COVERAGE = %.2f" % ((100.0*len(CODE_COVERAGE))/(len(FILE_PC_OPCODES)-err_count))) + "%")
     if (TIMESTAMP_DETECTION):
         print("TIMESTAMP DEPENDENCY DETECTED")
     if (BLOCKNUMBER_DETECTION):

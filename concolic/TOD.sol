@@ -1,6 +1,6 @@
 pragma solidity ^0.4.0;
 
-contract TOD {
+contract TOD {      // OYENTE MISSES
     address public owner;
     bool public locked;
     uint256 prize;
@@ -18,9 +18,9 @@ contract TOD {
             throw;
         locked = true;
         if(isCorrect(solution)) {
-            getter.send(prize);
+            getter.transfer(prize);
         }else {
-            getter.send(1);
+            getter.transfer(1);
         }
         locked = false;
     }

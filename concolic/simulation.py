@@ -1105,7 +1105,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             MISHANDLED_EXCEPTION_SYM_VARS.append(mishandled_sym)
             my_balance = "my_balance"
             if(my_balance in SYM_PATH_CONDITIONS_AND_VARS):
-                MISHANDLED_EXCEPTION_SYM_VAR_EQS.append(If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), 0, 1))
+                MISHANDLED_EXCEPTION_SYM_VAR_EQS.append(If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), BitVecVal(0, 256), BitVecVal(1, 256)))
                 SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
                     If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), BitVecVal(0, 256), BitVecVal(1, 256)))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = SYM_PATH_CONDITIONS_AND_VARS[my_balance] - transfer_amount
@@ -1222,7 +1222,7 @@ def symbolic_execute_opcode(opcode, FILE_OPCODES, FILE_PC_OPCODES):
             MISHANDLED_EXCEPTION_SYM_VARS.append(mishandled_sym)
             my_balance = "my_balance"
             if (my_balance in SYM_PATH_CONDITIONS_AND_VARS):
-                MISHANDLED_EXCEPTION_SYM_VAR_EQS.append(If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), 0, 1))
+                MISHANDLED_EXCEPTION_SYM_VAR_EQS.append(If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), BitVecVal(0, 256), BitVecVal(1, 256)))
                 SYM_PATH_CONDITIONS_AND_VARS["path_condition"].append(
                     If(UGT(transfer_amount, SYM_PATH_CONDITIONS_AND_VARS[my_balance]), 0, 1))
                 SYM_PATH_CONDITIONS_AND_VARS[my_balance] = SYM_PATH_CONDITIONS_AND_VARS[my_balance] - transfer_amount
